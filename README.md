@@ -1,6 +1,5 @@
 # LaundryFlow
 Laundry room management system for student residences.  
-REST API built with Node.js, Express, and Microsoft SQL Server, containerized with Docker.
 
 ---
 
