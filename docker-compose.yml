@@ -1,0 +1,43 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: mssql
+      DB_USER: sa
+      DB_PASSWORD: YourPassword123!
+      DB_NAME: LaundryFlowDB
+    depends_on:
+      mssql:
+        condition: service_healthy
+    networks:
+      - laundryflow-network
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      SA_PASSWORD: "YourPassword123!"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+      - ./db/init.sql:/db/init.sql
+      - ./db/entrypoint.sh:/db/entrypoint.sh
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourPassword123!' -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    entrypoint: /bin/bash -c "/db/entrypoint.sh & /opt/mssql/bin/sqlservr"
+    networks:
+      - laundryflow-network
+
+volumes:
+  mssql-data:
+
+networks:
+  laundryflow-network:
+    driver: bridge
