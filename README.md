@@ -82,10 +82,23 @@ DB_PORT=1433
 DB_USER=sa
 DB_PASSWORD=YourPassword123!
 DB_NAME=LaundryFlowDB
+
+# Optional: send an email and/or SMS when a machine finishes
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=
+SMTP_PASS=
+NOTIFY_FROM_EMAIL=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
 ```
 
 > The values above match the default Docker configuration and work out of the box.  
 > If you change `DB_PASSWORD`, update it consistently in `docker-compose.yml` as well.
+
+> Email and SMS notifications are optional. If the SMTP/Twilio variables are empty, the app will finish cycles normally but will not send alerts.
 
 ### 3. Start the application
 
@@ -236,7 +249,7 @@ laundryflow-app/
 ├── db/
 │   ├── init.sql             # Creates the database schema on first startup
 │   └── entrypoint.sh        # Waits for SQL Server to be ready, then runs init.sql
-└── frontend/                # TO DO
+└── backend/public/          # Static frontend served by Express
 └── backend/
     ├── server.js            # Express server and all API routes
     ├── package.json

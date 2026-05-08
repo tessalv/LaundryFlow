@@ -1,11 +1,20 @@
 const express = require('express');
 const mssql = require('mssql');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve frontend static assets from backend/public.
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve the frontend entrypoint at root.
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // SQL Server configuration
 const sqlConfig = {
