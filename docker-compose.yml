@@ -1,43 +1,65 @@
+# Main application services
 services:
   backend:
-    build: ./backend
+    # Builds and runs the Express API server
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    # Load local backend environment variables
+    env_file:
+      - ./backend/.env
+    # Expose the backend API on localhost:3000
     ports:
       - "3000:3000"
+    # Database connection values used by the backend container
     environment:
       DB_HOST: mssql
+      DB_PORT: 1433
       DB_USER: sa
-      DB_PASSWORD: YourPassword123!
       DB_NAME: LaundryFlowDB
+    # Wait until SQL Server passes its health check before starting
     depends_on:
       mssql:
         condition: service_healthy
+    # Shared network for backend and database containers
     networks:
       - laundryflow-network
 
   mssql:
+    # SQL Server 2022 database container
     image: mcr.microsoft.com/mssql/server:2022-latest
+    # Load the shared environment file so SQL Server gets its password from there
+    env_file:
+      - ./backend/.env
+    # Required SQL Server startup settings
     environment:
-      SA_PASSWORD: "YourPassword123!"
       ACCEPT_EULA: "Y"
+    # Expose SQL Server for local development and debugging
     ports:
       - "1433:1433"
+    # Persist database files and initialize the schema on startup
     volumes:
       - mssql-data:/var/opt/mssql
       - ./db/init.sql:/db/init.sql
       - ./db/entrypoint.sh:/db/entrypoint.sh
+    # Simple health check used by the backend dependency gate
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourPassword123!' -C -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    # Run the initialization script before SQL Server starts
     entrypoint: /bin/bash -c "/db/entrypoint.sh & /opt/mssql/bin/sqlservr"
+    # Shared network for backend and database containers
     networks:
       - laundryflow-network
 
+# Named volume that keeps SQL Server data between restarts
 volumes:
   mssql-data:
 
+# Dedicated bridge network for service-to-service communication
 networks:
   laundryflow-network:
     driver: bridge

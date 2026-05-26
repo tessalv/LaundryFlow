@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LaundryFlow</title>
+
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+    <!-- Hero banner with decorative background shapes -->
+    <div class="top-banner" aria-label="LaundryFlow top banner">
+        <!-- Abstract banner blobs -->
+        <svg class="banner-blobs" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M-50,130 C200,50 400,190 700,110 C1000,30 1250,170 1500,90 L1500,240 L-50,240 Z" fill="#365fb3"
+                opacity="0.16" />
+            <path d="M-50,160 C250,100 500,210 800,150 C1100,90 1300,190 1500,140 L1500,240 L-50,240 Z" fill="#f26b6d"
+                opacity="0.22" />
+        </svg>
+
+        <!-- Floating decorative bubbles -->
+        <span class="banner-bubble bubble-left-1"></span>
+        <span class="banner-bubble bubble-left-2"></span>
+        <span class="banner-bubble bubble-left-3"></span>
+        <span class="banner-bubble bubble-right-1"></span>
+        <span class="banner-bubble bubble-right-2"></span>
+        <span class="banner-bubble bubble-right-3"></span>
+        <span class="banner-bubble bubble-center-1"></span>
+        <span class="banner-bubble bubble-center-2"></span>
+        <span class="banner-bubble bubble-center-3"></span>
+
+        <div class="banner-content">
+            <h1 class="banner-title">Laundry<span class="banner-accent">Flow</span></h1>
+        </div>
+    </div>
+
+    <!-- Moderator code modal (4-digit) shown before Add Machine form -->
+    <div id="moderator-code-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card start-modal-card" role="dialog" aria-modal="true" aria-labelledby="moderator-code-title">
+            <h3 id="moderator-code-title">Enter Moderator Code</h3>
+            <p class="modal-subtitle">Enter the 4-digit moderator code to access the Add Machine form.</p>
+
+            <form id="moderator-code-form" novalidate>
+                <div id="moderator-form-error" class="form-error-banner" aria-live="polite"></div>
+                <div class="field-group field-group-full">
+                    <div class="repair-code-row">
+                        <input data-mod-digit name="modDigit1" class="repair-code-input" type="text" inputmode="numeric"
+                            maxlength="1" aria-label="Digit 1" />
+                        <input data-mod-digit name="modDigit2" class="repair-code-input" type="text" inputmode="numeric"
+                            maxlength="1" aria-label="Digit 2" />
+                        <input data-mod-digit name="modDigit3" class="repair-code-input" type="text" inputmode="numeric"
+                            maxlength="1" aria-label="Digit 3" />
+                        <input data-mod-digit name="modDigit4" class="repair-code-input" type="text" inputmode="numeric"
+                            maxlength="1" aria-label="Digit 4" />
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="cancel-moderator-code" class="report-btn" type="button">Cancel</button>
+                    <button id="submit-moderator-code" class="start-btn" type="submit">Enter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+
+    <!-- Main dashboard content -->
+    <main class="container">
+
+        <!-- Dashboard header and live status -->
+        <section class="page-header">
+            <div>
+                <h1>Laundry Machines</h1>
+                <p>Monitor machine availability in real time.</p>
+            </div>
+
+            <button id="usage-stats-btn" class="usage-stats-btn" type="button">+ Statistics</button>
+        </section>
+
+        <!-- Quick summary cards -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <span>Available</span>
+                <h2 id="available-count">0</h2>
+            </div>
+
+            <div class="stat-card">
+                <span>In Use</span>
+                <h2 id="inuse-count">0</h2>
+            </div>
+
+            <div class="stat-card">
+                <span>Maintenance</span>
+                <h2 id="maintenance-count">0</h2>
+            </div>
+
+            <div class="stat-card">
+                <span>Total</span>
+                <h2 id="total-count">0</h2>
+            </div>
+        </section>
+
+        <!-- Machine list -->
+        <section>
+            <div class="section-title section-title-row">
+                <h2>All Machines</h2>
+                <button id="add-machine-btn" class="add-machine-btn" type="button">+ Add Machine</button>
+            </div>
+
+            <div id="machines-loading" class="loading-state">Loading machines...</div>
+            <div id="machines-grid" class="machines-grid"></div>
+        </section>
+
+        <!-- Usage stats modal -->
+        <div id="usage-stats-modal" class="modal-overlay" aria-hidden="true">
+            <div class="modal-card usage-modal-card" role="dialog" aria-modal="true"
+                aria-labelledby="usage-stats-title">
+                <div class="usage-modal-header">
+                    <div>
+                        <h3 id="usage-stats-title">Statistics</h3>
+                        <p class="modal-subtitle">Hours used over time.</p>
+                    </div>
+                    <button id="close-usage-stats-btn" class="report-btn usage-close-btn" type="button">Close</button>
+                </div>
+
+                <div class="section-title-row usage-modal-toolbar">
+                    <div class="usage-machine-filter">
+                        <label for="usage-machine-select" class="field-label">Machine</label>
+                        <select id="usage-machine-select">
+                            <option value="all">All machines</option>
+                        </select>
+                    </div>
+
+                    <div class="usage-range-buttons" role="tablist" aria-label="Usage range filters">
+                        <button class="usage-range-btn active" type="button" data-usage-range="7d">7 days</button>
+                        <button class="usage-range-btn" type="button" data-usage-range="month">Month</button>
+                        <button class="usage-range-btn" type="button" data-usage-range="year">Year</button>
+                    </div>
+                </div>
+
+                <div class="usage-summary">
+                    <div class="usage-summary-card">
+                        <span>Total hours</span>
+                        <strong id="usage-total-count">0</strong>
+                    </div>
+                    <div class="usage-summary-card">
+                        <span>Peak bucket</span>
+                        <strong id="usage-peak-count">0</strong>
+                    </div>
+                    <div class="usage-summary-card">
+                        <span>Average hours</span>
+                        <strong id="usage-average-count">0</strong>
+                    </div>
+                </div>
+
+                <div id="usage-chart" class="usage-chart" aria-label="Machine usage chart"></div>
+            </div>
+        </div>
+
+        <!-- Maintenance stats modal -->
+        <div id="maintenance-stats-modal" class="modal-overlay" aria-hidden="true">
+            <div class="modal-card maintenance-modal-card" role="dialog" aria-modal="true"
+                aria-labelledby="maintenance-stats-title">
+                <div class="usage-modal-header">
+                    <div>
+                        <h3 id="maintenance-stats-title">Maintenance Statistics</h3>
+                        <p class="modal-subtitle">Time since the last resolved maintenance event per machine.</p>
+                    </div>
+                    <button id="close-maintenance-stats-btn" class="report-btn usage-close-btn"
+                        type="button">Close</button>
+                </div>
+
+                <div class="section-title-row usage-modal-toolbar maintenance-modal-toolbar">
+                    <div class="usage-machine-filter">
+                        <label for="maintenance-machine-select" class="field-label">Machine</label>
+                        <select id="maintenance-machine-select">
+                            <option value="all">All machines</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="maintenance-stats-grid" class="maintenance-stats-grid"></div>
+            </div>
+        </div>
+
+        <!-- Maintenance issues table -->
+        <section class="issues-section">
+            <div class="section-title section-title-row">
+                <h2>Maintenance Issues</h2>
+                <button id="maintenance-stats-btn" class="usage-stats-btn maintenance-stats-btn" type="button">+
+                    Maintenance Stats</button>
+            </div>
+
+            <div id="issues-loading" class="loading-state">Loading issues...</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Machine</th>
+                        <th>Issue</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody id="issues-table"></tbody>
+            </table>
+        </section>
+
+    </main>
+
+    <!-- Toast notifications shown by the app -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Issue report modal -->
+    <div id="issue-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="issue-modal-title">
+            <h3 id="issue-modal-title">Report an Issue</h3>
+            <p id="issue-machine-label" class="modal-subtitle"></p>
+            <label for="issue-description" class="field-label">Describe the issue</label>
+            <textarea id="issue-description" rows="4" placeholder="Example: Machine not spinning"></textarea>
+            <div class="modal-actions">
+                <button id="cancel-issue-btn" class="report-btn" type="button">Cancel</button>
+                <button id="submit-issue-btn" class="start-btn" type="button">Submit Report</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session start modal -->
+    <div id="start-session-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card start-modal-card" role="dialog" aria-modal="true" aria-labelledby="start-session-title">
+            <h3 id="start-session-title">Start Laundry Session</h3>
+            <p id="start-machine-label" class="modal-subtitle"></p>
+
+            <form id="start-session-form" novalidate>
+                <div id="start-form-error" class="form-error-banner" aria-live="polite"></div>
+
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="first-name" class="field-label">First Name</label>
+                        <input id="first-name" name="firstName" type="text" autocomplete="given-name" required />
+                        <p class="field-error" data-error-for="firstName"></p>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="last-name" class="field-label">Last Name</label>
+                        <input id="last-name" name="lastName" type="text" autocomplete="family-name" required />
+                        <p class="field-error" data-error-for="lastName"></p>
+                    </div>
+
+                    <div class="field-group field-group-full">
+                        <label for="email-address" class="field-label">Email Address</label>
+                        <input id="email-address" name="email" type="email" autocomplete="email" required />
+                        <p class="field-error" data-error-for="email"></p>
+                    </div>
+
+                    <div class="field-group field-group-full">
+                        <label for="phone-number" class="field-label">Phone Number</label>
+                        <div class="phone-input-row">
+                            <input id="country-code" name="countryCode" class="phone-code-input" type="tel"
+                                inputmode="tel" placeholder="+xx" aria-label="Country code" />
+                            <input id="phone-number" name="phoneNumber" class="phone-number-input" type="tel"
+                                autocomplete="tel" placeholder="Phone number" required />
+                        </div>
+                        <p class="field-error" data-error-for="countryCode"></p>
+                        <p class="field-error" data-error-for="phoneNumber"></p>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="apartment-number" class="field-label">Apartment Number</label>
+                        <input id="apartment-number" name="apartmentNumber" type="text" required />
+                        <p class="field-error" data-error-for="apartmentNumber"></p>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="room-number" class="field-label">Room Number</label>
+                        <input id="room-number" name="roomNumber" type="text" required />
+                        <p class="field-error" data-error-for="roomNumber"></p>
+                    </div>
+
+                    <div class="field-group field-group-full">
+                        <label for="duration-time" class="field-label">Machine Duration (hh:mm)</label>
+                        <input id="duration-time" name="durationTime" type="text" inputmode="numeric"
+                            placeholder="00:00" required />
+                        <p class="field-error" data-error-for="durationTime"></p>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="cancel-start-btn" class="report-btn" type="button">Cancel</button>
+                    <button id="submit-start-btn" class="start-btn" type="submit">Start Session</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Stop or collect confirmation modal -->
+    <div id="stop-confirm-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="stop-confirm-title">
+            <h3 id="stop-confirm-title">Confirm Stop Session</h3>
+            <p class="modal-subtitle">To stop this machine, please confirm your apartment and room number.</p>
+
+            <form id="stop-confirm-form" novalidate>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="confirm-apartment" class="field-label">Apartment Number</label>
+                        <input id="confirm-apartment" name="confirmApartment" type="text" required />
+                        <p class="field-error" data-error-for="confirmApartment"></p>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="confirm-room" class="field-label">Room Number</label>
+                        <input id="confirm-room" name="confirmRoom" type="text" required />
+                        <p class="field-error" data-error-for="confirmRoom"></p>
+                    </div>
+
+                </div>
+
+                <div class="modal-actions">
+                    <button id="cancel-stop-confirm" class="report-btn" type="button">Cancel</button>
+                    <button id="open-moderator-confirm" class="moderator-btn" type="button">Moderator</button>
+                    <button id="submit-stop-confirm" class="start-btn" type="submit">Confirm Stop</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Moderator repair / unlock modal -->
+    <div id="repair-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card start-modal-card" role="dialog" aria-modal="true" aria-labelledby="repair-modal-title">
+            <h3 id="repair-modal-title">Confirm Repair</h3>
+            <p id="repair-machine-label" class="modal-subtitle"></p>
+
+            <form id="repair-form" novalidate>
+                <div id="repair-form-error" class="form-error-banner" aria-live="polite"></div>
+
+                <div class="field-group field-group-full">
+                    <label class="field-label">Moderator Code</label>
+                    <div class="repair-code-row" aria-label="Moderator code, 4 digits">
+                        <input data-repair-code-digit name="repairDigit1" class="repair-code-input" type="text"
+                            inputmode="numeric" maxlength="1" aria-label="Digit 1" />
+                        <input data-repair-code-digit name="repairDigit2" class="repair-code-input" type="text"
+                            inputmode="numeric" maxlength="1" aria-label="Digit 2" />
+                        <input data-repair-code-digit name="repairDigit3" class="repair-code-input" type="text"
+                            inputmode="numeric" maxlength="1" aria-label="Digit 3" />
+                        <input data-repair-code-digit name="repairDigit4" class="repair-code-input" type="text"
+                            inputmode="numeric" maxlength="1" aria-label="Digit 4" />
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="cancel-repair-btn" class="report-btn" type="button">Cancel</button>
+                    <button id="submit-repair-btn" class="start-btn" type="submit">Mark Repaired</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add machine modal -->
+    <div id="add-machine-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card start-modal-card" role="dialog" aria-modal="true" aria-labelledby="add-machine-title">
+            <h3 id="add-machine-title">Add Machine</h3>
+            <p class="modal-subtitle">Moderator access is required before creating a new machine.</p>
+
+            <form id="add-machine-form" novalidate>
+                <div id="add-machine-form-error" class="form-error-banner" aria-live="polite"></div>
+
+                <div class="form-grid">
+                    <!-- Moderator code is requested in a separate modal with 4 digits -->
+
+                    <div class="field-group field-group-full">
+                        <label for="add-machine-type" class="field-label">Machine Type</label>
+                        <select id="add-machine-type" name="machineType" required>
+                            <option value="washer">Washer</option>
+                            <option value="dryer">Dryer</option>
+                        </select>
+                        <p class="field-error" data-error-for="machineType"></p>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="add-machine-brand" class="field-label">Brand</label>
+                        <input id="add-machine-brand" name="machineBrand" type="text" placeholder="Samsung" required />
+                        <p class="field-error" data-error-for="machineBrand"></p>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="add-machine-reference" class="field-label">Reference</label>
+                        <input id="add-machine-reference" name="machineReference" type="text" placeholder="WSH-1001"
+                            required />
+                        <p class="field-error" data-error-for="machineReference"></p>
+                    </div>
+
+                    <div class="field-group field-group-full">
+                        <label for="add-machine-installed-at" class="field-label">Installation Date</label>
+                        <input id="add-machine-installed-at" name="installedAt" type="date" required />
+                        <p class="field-error" data-error-for="installedAt"></p>
+                    </div>
+
+                    <div class="field-group field-group-full">
+                        <p id="add-machine-preview" class="machine-preview">New machine name: Washer 1</p>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="cancel-add-machine-btn" class="report-btn" type="button">Cancel</button>
+                    <button id="submit-add-machine-btn" class="start-btn" type="submit">Create Machine</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

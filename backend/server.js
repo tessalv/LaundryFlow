@@ -1,38 +1,84 @@
+/**
+ * =========================================================
+ * LaundryFlow Backend Server
+ * =========================================================
+ * Main Express server responsible for:
+ * - REST API endpoints
+ * - SQL Server database communication
+ * - Frontend static file hosting
+ * =========================================================
+ */
+
 const express = require('express');
 const mssql = require('mssql');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+// =========================================================
+// EXPRESS APPLICATION CONFIGURATION
+// =========================================================
+
+/** Express application instance */
 const app = express();
+
+/** Enable Cross-Origin Resource Sharing */
 app.use(cors());
+
+/** Enable JSON request body parsing */
 app.use(express.json());
 
-// Serve frontend static assets from backend/public.
-app.use(express.static(path.join(__dirname, 'public')));
+// =========================================================
+// FRONTEND CONFIGURATION
+// =========================================================
 
-// Serve the frontend entrypoint at root.
+/** Path to the frontend directory */
+const frontendDir = path.join(__dirname, '..', 'frontend');
+
+/** Serve static frontend assets */
+app.use(express.static(frontendDir));
+
+/** Serve frontend entry point */
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(frontendDir, 'index.html'));
 });
 
-// SQL Server configuration
+// =========================================================
+// SQL SERVER CONFIGURATION
+// =========================================================
+
+/**
+ * SQL Server connection configuration.
+ */
 const sqlConfig = {
   authentication: {
     type: 'default',
     options: {
-      userName: process.env.DB_USER || 'sa',
-      password: process.env.DB_PASSWORD || 'YourPassword123!',
+      /** Database username */
+      userName: process.env.DB_USER,
+
+      /** Database password */
+      password: process.env.DB_PASSWORD,
     }
   },
-  server: process.env.DB_HOST || 'mssql',
-  database: process.env.DB_NAME || 'LaundryFlowDB',
-  port: parseInt(process.env.DB_PORT || '1433'),
+
+  /** SQL Server hostname */
+  server: process.env.DB_HOST,
+
+  /** Target database name */
+  database: process.env.DB_NAME,
+
+  /** SQL Server port */
+  port: parseInt(process.env.DB_PORT),
+
+  /** Connection pool configuration */
   pool: {
     max: 10,
     min: 0,
     idleTimeoutMillis: 30000
   },
+
+  /** SQL driver options */
   options: {
     encrypt: false,
     trustServerCertificate: true,
@@ -42,9 +88,20 @@ const sqlConfig = {
   }
 };
 
+/** Database connection status flag */
 let dbConnected = false;
 
-// Initialize database connection
+// =========================================================
+// DATABASE INITIALIZATION
+// =========================================================
+
+/**
+ * Initialize SQL Server connection.
+ * Retries automatically if the connection fails.
+ *
+ * @async
+ * @returns {Promise<void>}
+ */
 async function initializeDatabase() {
   try {
     const pool = new mssql.ConnectionPool(sqlConfig);
@@ -242,16 +299,25 @@ app.get('/api/machines/:id', async (req, res) => {
 // Create a new machine
 app.post('/api/machines', async (req, res) => {
   try {
-    const { name, type } = req.body;
-    if (!name || !type) {
-      return res.status(400).json({ error: 'Name and type are required' });
+    const { name, type, brand, reference, installedAt } = req.body;
+    if (!name || !type || !brand || !reference || !installedAt) {
+      return res.status(400).json({ error: 'Name, type, brand, reference, and installedAt are required' });
     }
+
+    const parsedInstalledAt = new Date(installedAt);
+    if (!Number.isFinite(parsedInstalledAt.getTime())) {
+      return res.status(400).json({ error: 'installedAt must be a valid date' });
+    }
+
     const pool = new mssql.ConnectionPool(sqlConfig);
     await pool.connect();
     await pool.request()
       .input('name', mssql.VarChar, name)
       .input('type', mssql.VarChar, type)
-      .query('INSERT INTO Machines (Name, Type) VALUES (@name, @type)');
+      .input('brand', mssql.VarChar, brand)
+      .input('reference', mssql.VarChar, reference)
+      .input('installedAt', mssql.DateTime, parsedInstalledAt)
+      .query('INSERT INTO Machines (Name, Type, Brand, Reference, InstalledAt) VALUES (@name, @type, @brand, @reference, @installedAt)');
     pool.close();
     res.status(201).json({ message: 'Machine created successfully' });
   } catch (err) {
@@ -385,7 +451,7 @@ app.put('/api/issues/:id', async (req, res) => {
     await pool.connect();
     await pool.request()
       .input('id', mssql.Int, req.params.id)
-      .query('UPDATE MachineIssues SET IsResolved = 1 WHERE Id = @id');
+      .query('UPDATE MachineIssues SET IsResolved = 1, ResolvedAt = GETDATE() WHERE Id = @id');
     pool.close();
     res.json({ message: 'Issue marked as resolved' });
   } catch (err) {
@@ -405,7 +471,7 @@ app.get('/api/test', (req, res) => {
 // START SERVER
 // ===========================
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 initializeDatabase();
 

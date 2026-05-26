@@ -25,6 +25,8 @@ LaundryFlow provides a backend API to manage:
 - **Sessions** — Machine usage tracking
 - **Issues** — Maintenance incident reporting
 
+The browser app that users should open is served from `frontend/`. The root Express route in `backend/server.js` points to that folder, so the frontend directory is the source of truth for the web experience.
+
 
 
 ## Tech Stack
@@ -83,7 +85,7 @@ DB_USER=sa
 DB_PASSWORD=YourPassword123!
 DB_NAME=LaundryFlowDB
 
-# Optional: send an email and/or SMS when a machine finishes
+# Optional: legacy SMS / SMTP notifications
 SMTP_HOST=
 SMTP_PORT=587
 SMTP_SECURE=false
@@ -98,7 +100,7 @@ TWILIO_FROM_NUMBER=
 > The values above match the default Docker configuration and work out of the box.  
 > If you change `DB_PASSWORD`, update it consistently in `docker-compose.yml` as well.
 
-> Email and SMS notifications are optional. If the SMTP/Twilio variables are empty, the app will finish cycles normally but will not send alerts.
+> SMS notifications are optional. If the SMTP/Twilio variables are empty, the app will finish cycles normally but will not send alerts.
 
 ### 3. Start the application
 
@@ -137,6 +139,22 @@ Expected response:
 ```
 
 The application is fully operational. No additional setup is required.
+
+### 5. Open the public UI
+
+Open this URL in your browser:
+
+```text
+http://localhost:3000/
+```
+
+If you deploy the backend to a public host, the same UI will be available at that host's URL because Express serves the static files from `frontend/`.
+
+### Folder Roles
+
+- `frontend/` is the canonical browser-facing app.
+- `backend/public/` is legacy duplicate content and should no longer be used.
+- If you change the UI, update `frontend/` first so the running app stays in sync with what users see.
 
 ---
 
@@ -249,14 +267,17 @@ laundryflow-app/
 ├── db/
 │   ├── init.sql             # Creates the database schema on first startup
 │   └── entrypoint.sh        # Waits for SQL Server to be ready, then runs init.sql
-└── backend/public/          # Static frontend served by Express
-└── backend/
-    ├── server.js            # Express server and all API routes
-    ├── package.json
-    ├── Dockerfile
-    ├── .dockerignore
-    ├── .env                 # Local credentials — not committed to Git
-    └── .env.example         # Template to copy for your own .env
+├── backend/
+│   ├── server.js            # Express server and all API routes
+│   ├── package.json
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   ├── .env                 # Local credentials — not committed to Git
+│   └── .env.example         # Template to copy for your own .env
+└── frontend/                # Static frontend served by Express
+    ├── index.html
+    ├── app.js
+    └── style.css
 ```
 
 ---
