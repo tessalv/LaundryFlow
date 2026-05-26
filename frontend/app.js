@@ -44,6 +44,9 @@ const state = {
     activeStartMachineId: null,
     activeStopMachineId: null,
     activeStopAction: "stop",
+    activeModeratorAction: "add",
+    activeModeratorMachineId: null,
+    activeModeratorMachineName: "",
     activeUsageRange: "7d",
     activeUsageMachineId: "all",
     activeMaintenanceMachineId: "all",
@@ -94,6 +97,7 @@ const dom = {
     moderatorCodeModal: document.getElementById("moderator-code-modal"),
     moderatorCodeForm: document.getElementById("moderator-code-form"),
     moderatorFormError: document.getElementById("moderator-form-error"),
+    moderatorCodeSubtitle: document.getElementById("moderator-code-subtitle"),
     moderatorCodeInputs: Array.from(document.querySelectorAll("[data-mod-digit]")),
     cancelModeratorCodeBtn: document.getElementById("cancel-moderator-code"),
     submitModeratorCodeBtn: document.getElementById("submit-moderator-code"),
@@ -230,6 +234,10 @@ const api = {
     createMachine: payload => apiRequest("/api/machines", {
         method: "POST",
         body: JSON.stringify(payload)
+    }),
+    deleteMachine: (machineId, moderatorCode) => apiRequest(`/api/machines/${machineId}`, {
+        method: "DELETE",
+        body: JSON.stringify({ moderatorCode })
     }),
     createUser: payload => apiRequest("/api/users", {
         method: "POST",
@@ -817,6 +825,15 @@ function renderMachines() {
         const cardStatusClass = isWaitingCollection ? "status-waiting-collection" : `status-${machine.status}`;
         const machineHtml = `
                 <div class="machine-card ${cardStatusClass} ${isSessionPending ? "loading" : ""}">
+                    <button
+                        class="delete-corner-btn"
+                        type="button"
+                        aria-label="Delete machine ${machine.name}"
+                        data-action="delete"
+                        data-machine-id="${machine.id}"
+                    >
+                        ×
+                    </button>
                     <div class="machine-header">
                         <div>
                             <h3>${machine.name}</h3>
@@ -1470,10 +1487,33 @@ function openAddMachineModal() {
     }
 }
 
-/** Opens the moderator code modal which gates access to Add Machine form. */
-function openModeratorCodeModal() {
+/** Updates the moderator modal copy and actions for the active flow. */
+function setModeratorCodeModalContext(action = "add", machineName = "") {
+    const isDeleteFlow = action === "delete";
+    if (dom.moderatorCodeModal) {
+        dom.moderatorCodeModal.dataset.moderatorAction = action;
+    }
+    if (dom.moderatorCodeSubtitle) {
+        dom.moderatorCodeSubtitle.textContent = isDeleteFlow
+            ? `Enter the 4-digit moderator code to delete ${machineName || "this machine"}.`
+            : "Enter the 4-digit moderator code to access the Add Machine form.";
+    }
+    if (dom.submitModeratorCodeBtn) {
+        dom.submitModeratorCodeBtn.textContent = isDeleteFlow ? "Delete Machine" : "Enter";
+    }
+}
+
+/** Opens the moderator code modal which gates access to Add Machine or delete actions. */
+function openModeratorCodeModal(action = "add", machineId = null) {
     if (!dom.moderatorCodeForm) return;
     if (dom.moderatorCodeForm) dom.moderatorCodeForm.reset();
+    const targetMachine = Number.isFinite(Number(machineId))
+        ? state.machineViewModels.find(item => item.id === Number(machineId))
+        : null;
+    state.activeModeratorAction = action;
+    state.activeModeratorMachineId = targetMachine ? targetMachine.id : null;
+    state.activeModeratorMachineName = targetMachine ? targetMachine.name : "";
+    setModeratorCodeModalContext(action, state.activeModeratorMachineName);
     if (dom.moderatorFormError) {
         dom.moderatorFormError.textContent = "";
         dom.moderatorFormError.classList.remove("show");
@@ -1491,6 +1531,10 @@ function closeModeratorCodeModal() {
     if (!dom.moderatorCodeModal) return;
     dom.moderatorCodeModal.classList.remove("open");
     dom.moderatorCodeModal.setAttribute("aria-hidden", "true");
+    state.activeModeratorAction = "add";
+    state.activeModeratorMachineId = null;
+    state.activeModeratorMachineName = "";
+    setModeratorCodeModalContext("add");
 }
 
 /** Returns the 4-digit moderator code entered in the moderator modal. */
@@ -1518,6 +1562,33 @@ async function submitModeratorCodeForm(event) {
             dom.moderatorFormError.classList.add("show");
         }
         dom.moderatorCodeInputs.forEach(input => input.classList.add("invalid"));
+        return;
+    }
+
+    const isDeleteFlow = state.activeModeratorAction === "delete";
+
+    if (isDeleteFlow) {
+        if (!state.activeModeratorMachineId) {
+            closeModeratorCodeModal();
+            return;
+        }
+
+        dom.submitModeratorCodeBtn.disabled = true;
+        try {
+            await api.deleteMachine(state.activeModeratorMachineId, code);
+            clearSessionMeta(state.activeModeratorMachineId);
+            closeModeratorCodeModal();
+            await refreshDashboardData();
+            showToast(`${state.activeModeratorMachineName || "Machine"} deleted successfully.`, "success");
+        } catch (err) {
+            if (dom.moderatorFormError) {
+                dom.moderatorFormError.textContent = err.message || "Unable to delete machine.";
+                dom.moderatorFormError.classList.add("show");
+            }
+            showToast(`Could not delete machine: ${err.message}`, "error");
+        } finally {
+            dom.submitModeratorCodeBtn.disabled = false;
+        }
         return;
     }
 
@@ -2377,7 +2448,7 @@ function attachStartFormListeners() {
 /** Attaches the global application event listeners. */
 function attachEventListeners() {
     if (dom.addMachineButton) {
-        dom.addMachineButton.addEventListener("click", openModeratorCodeModal);
+        dom.addMachineButton.addEventListener("click", () => openModeratorCodeModal("add"));
     }
 
     // Moderator code modal handlers
@@ -2431,6 +2502,10 @@ function attachEventListeners() {
 
         if (action === "report") {
             openIssueModal(machineId);
+        }
+
+        if (action === "delete") {
+            openModeratorCodeModal("delete", machineId);
         }
     });
 

@@ -43,6 +43,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(frontendDir, 'index.html'));
 });
 
+/** Moderator code used for privileged destructive actions. */
+const MODERATOR_CODE = process.env.MODERATOR_CODE || '0000';
+
 // =========================================================
 // SQL SERVER CONFIGURATION
 // =========================================================
@@ -325,6 +328,42 @@ app.post('/api/machines', async (req, res) => {
   }
 });
 
+// Delete a machine and its related sessions/issues
+app.delete('/api/machines/:id', async (req, res) => {
+  let transaction;
+  try {
+    const { moderatorCode } = req.body || {};
+    if (String(moderatorCode || '').trim() !== MODERATOR_CODE) {
+      return res.status(403).json({ error: 'Invalid moderator code' });
+    }
+
+    const pool = new mssql.ConnectionPool(sqlConfig);
+    await pool.connect();
+    transaction = new mssql.Transaction(pool);
+    await transaction.begin();
+
+    const request = new mssql.Request(transaction);
+    request.input('id', mssql.Int, req.params.id);
+
+    await request.query('DELETE FROM MachineIssues WHERE MachineId = @id;');
+    await request.query('DELETE FROM MachineSessions WHERE MachineId = @id;');
+    await request.query('DELETE FROM Machines WHERE Id = @id;');
+
+    await transaction.commit();
+    pool.close();
+    res.json({ message: 'Machine deleted successfully' });
+  } catch (err) {
+    if (transaction) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        // ignore rollback errors and return the original failure
+      }
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ===========================
 // MACHINE SESSIONS ENDPOINTS
 // ===========================
@@ -494,6 +533,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('  GET    /api/machines');
   console.log('  GET    /api/machines/:id');
   console.log('  POST   /api/machines\n');
+  console.log('  DELETE /api/machines/:id\n');
   console.log('SESSIONS:');
   console.log('  GET    /api/sessions');
   console.log('  GET    /api/sessions/user/:userId');

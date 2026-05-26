@@ -709,6 +709,7 @@ body::after {
     border-radius: var(--radius-extra-large);
     box-shadow: var(--shadow-card-elevation);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
 }
 
 /* Inline ad card inside machines grid */
@@ -754,11 +755,46 @@ body::after {
     pointer-events: none;
 }
 
+.delete-corner-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(253, 102, 122, 0.12);
+    /* softer rouge-rosé */
+    color: #ef4444;
+    font-size: 15px;
+    font-weight: 900;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    opacity: 0.8;
+    padding: 0;
+}
+
+.delete-corner-btn:hover:not(:disabled) {
+    opacity: 1;
+    background: rgba(253, 102, 122, 0.18);
+    /* slightly stronger on hover */
+    transform: scale(1.04);
+}
+
+.delete-corner-btn:focus-visible {
+    outline: 2px solid rgba(253, 102, 122, 0.95);
+    outline-offset: 2px;
+}
+
 .machine-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    margin: 18px 0 15px;
 }
 
 .machine-meta {
@@ -978,6 +1014,15 @@ textarea.invalid {
 .repair-btn {
     background: linear-gradient(135deg, #dc2626, #ef4444);
     color: #ffffff;
+}
+
+.delete-btn {
+    background: linear-gradient(135deg, #7f1d1d, #dc2626);
+    color: #ffffff;
+}
+
+.delete-btn:hover:not(:disabled) {
+    filter: brightness(0.96);
 }
 
 .repair-btn:hover:not(:disabled) {
