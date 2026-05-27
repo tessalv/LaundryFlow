@@ -559,11 +559,14 @@ function getStatusLabel(status) {
  * @returns {string} Helper text for the machine card.
  */
 function getMachineHint(status, isWaitingCollection = false) {
-    if (status === "in-use" && isWaitingCollection) {
+    if (status === "waiting-collection" || (status === "in-use" && isWaitingCollection)) {
         return "Cycle complete. Waiting for pickup.";
     }
     if (status === "in-use") {
         return "Cycle currently running";
+    }
+    if (status === "waiting-collection") {
+        return "Cycle complete. Waiting for pickup.";
     }
     if (status === "maintenance") {
         return "Under maintenance";
@@ -606,13 +609,6 @@ function buildMachineViewModels() {
             ? String(sessionMeta.roomNumber)
             : roomParts.roomNumber || "Unknown";
 
-        let status = "available";
-        if (hasIssue) {
-            status = "maintenance";
-        } else if (activeSession) {
-            status = "in-use";
-        }
-
         let remainingSeconds = null;
         let progressPercent = null;
 
@@ -621,6 +617,15 @@ function buildMachineViewModels() {
             const elapsedMs = Math.max(0, state.timerNow - Number(sessionMeta.startMs));
             const totalMs = Math.max(1, Number(sessionMeta.endMs) - Number(sessionMeta.startMs));
             progressPercent = Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100));
+        }
+
+        let status = "available";
+        if (hasIssue) {
+            status = "maintenance";
+        } else if (activeSession) {
+            status = Number.isFinite(remainingSeconds) && remainingSeconds <= 0
+                ? "waiting-collection"
+                : "in-use";
         }
 
         return {
@@ -645,7 +650,7 @@ function buildMachineViewModels() {
 /** Renders the dashboard counters. */
 function renderStats() {
     const available = state.machineViewModels.filter(machine => machine.status === "available").length;
-    const inUse = state.machineViewModels.filter(machine => machine.status === "in-use").length;
+    const inUse = state.machineViewModels.filter(machine => machine.status === "in-use" || machine.status === "waiting-collection").length;
     const maintenance = state.machineViewModels.filter(machine => machine.status === "maintenance").length;
 
     dom.availableCount.textContent = String(available);
@@ -660,14 +665,14 @@ function renderStats() {
  * @returns {string} HTML markup for the running panel.
  */
 function renderRunningPanel(machine) {
-    if (machine.status !== "in-use") {
+    if (machine.status !== "in-use" && machine.status !== "waiting-collection") {
         return "";
     }
 
     const hasCountdown = Number.isFinite(machine.remainingSeconds);
-    const isComplete = hasCountdown && machine.remainingSeconds <= 0;
+    const isWaitingCollection = machine.status === "waiting-collection" || (hasCountdown && machine.remainingSeconds <= 0);
     const remainingLabel = hasCountdown
-        ? formatRemainingLabel(machine.remainingSeconds)
+        ? (isWaitingCollection ? "Waiting for pickup" : formatRemainingLabel(machine.remainingSeconds))
         : "Time remaining unavailable";
     const runningDetailsMarkup = `
             <div class="running-metrics">
@@ -686,7 +691,7 @@ function renderRunningPanel(machine) {
       </div>`
         : "";
 
-    const waitingCollectionMarkup = isComplete
+    const waitingCollectionMarkup = isWaitingCollection
         ? '<p class="collection-waiting-note">Cycle complete. Waiting for the owner to collect their laundry.</p>'
         : "";
 
@@ -696,7 +701,7 @@ function renderRunningPanel(machine) {
         <span class="live-indicator">Live cycle</span>
         <span class="timer-chip">${remainingLabel}</span>
       </div>
-            ${isComplete ? completedDetailsMarkup : runningDetailsMarkup}
+                        ${isWaitingCollection ? completedDetailsMarkup : runningDetailsMarkup}
             ${waitingCollectionMarkup}
       ${progressMarkup}
     </div>
@@ -735,8 +740,8 @@ function renderMachineActions(machine, isSessionPending) {
             `;
     }
 
-    if (machine.status === "in-use") {
-        const isWaitingCollection = Number.isFinite(machine.remainingSeconds) && machine.remainingSeconds <= 0;
+    if (machine.status === "in-use" || machine.status === "waiting-collection") {
+        const isWaitingCollection = machine.status === "waiting-collection";
         const primaryActionMarkup = isWaitingCollection
             ? `
             <button
@@ -758,7 +763,7 @@ function renderMachineActions(machine, isSessionPending) {
         return `
       <div class="machine-actions">
         <div class="actions-top">
-                <span class="timer-chip">${isWaitingCollection ? "Waiting for pickup" : (Number.isFinite(machine.remainingSeconds) ? formatRemainingLabel(machine.remainingSeconds) : "Cycle running")}</span>
+                                <span class="timer-chip">${isWaitingCollection ? "Waiting for pickup" : (Number.isFinite(machine.remainingSeconds) ? formatRemainingLabel(machine.remainingSeconds) : "Cycle running")}</span>
                 <button
                     class="report-btn"
                     data-action="report"
@@ -1490,16 +1495,23 @@ function openAddMachineModal() {
 /** Updates the moderator modal copy and actions for the active flow. */
 function setModeratorCodeModalContext(action = "add", machineName = "") {
     const isDeleteFlow = action === "delete";
+    const isCollectFlow = action === "collect";
     if (dom.moderatorCodeModal) {
         dom.moderatorCodeModal.dataset.moderatorAction = action;
     }
     if (dom.moderatorCodeSubtitle) {
         dom.moderatorCodeSubtitle.textContent = isDeleteFlow
             ? `Enter the 4-digit moderator code to delete ${machineName || "this machine"}.`
-            : "Enter the 4-digit moderator code to access the Add Machine form.";
+            : isCollectFlow
+                ? "Enter the 4-digit moderator code to validate collected stuff."
+                : "Enter the 4-digit moderator code to access the Add Machine form.";
     }
     if (dom.submitModeratorCodeBtn) {
-        dom.submitModeratorCodeBtn.textContent = isDeleteFlow ? "Delete Machine" : "Enter";
+        dom.submitModeratorCodeBtn.textContent = isDeleteFlow
+            ? "Delete Machine"
+            : isCollectFlow
+                ? "Validate Collection"
+                : "Enter";
     }
 }
 
@@ -1566,6 +1578,7 @@ async function submitModeratorCodeForm(event) {
     }
 
     const isDeleteFlow = state.activeModeratorAction === "delete";
+    const isCollectFlow = state.activeModeratorAction === "collect";
 
     if (isDeleteFlow) {
         if (!state.activeModeratorMachineId) {
@@ -1586,6 +1599,32 @@ async function submitModeratorCodeForm(event) {
                 dom.moderatorFormError.classList.add("show");
             }
             showToast(`Could not delete machine: ${err.message}`, "error");
+        } finally {
+            dom.submitModeratorCodeBtn.disabled = false;
+        }
+        return;
+    }
+
+    if (isCollectFlow) {
+        const machineId = state.activeModeratorMachineId;
+        const machineName = state.activeModeratorMachineName || "Machine";
+
+        if (!machineId) {
+            closeModeratorCodeModal();
+            return;
+        }
+
+        dom.submitModeratorCodeBtn.disabled = true;
+        try {
+            await stopSession(machineId, { suppressToast: true });
+            closeModeratorCodeModal();
+            showToast(`${machineName} collection validated.`, "success");
+        } catch (err) {
+            if (dom.moderatorFormError) {
+                dom.moderatorFormError.textContent = err.message || "Unable to validate collection.";
+                dom.moderatorFormError.classList.add("show");
+            }
+            showToast(`Could not validate collection: ${err.message}`, "error");
         } finally {
             dom.submitModeratorCodeBtn.disabled = false;
         }
@@ -1870,6 +1909,17 @@ function openStopConfirmModal(machineId, action = "stop") {
         dom.stopConfirmSubmit.textContent = action === "collect" ? "Confirm Collected" : "Confirm Stop";
     }
 
+    if (dom.stopConfirmForm) {
+        const apartmentField = dom.stopConfirmForm.elements.namedItem("confirmApartment");
+        const roomField = dom.stopConfirmForm.elements.namedItem("confirmRoom");
+        if (apartmentField instanceof HTMLInputElement) {
+            apartmentField.value = "";
+        }
+        if (roomField instanceof HTMLInputElement) {
+            roomField.value = "";
+        }
+    }
+
     if (dom.stopConfirmModal) {
         dom.stopConfirmModal.classList.add("open");
         dom.stopConfirmModal.setAttribute("aria-hidden", "false");
@@ -1898,7 +1948,7 @@ function openModeratorConfirmFromStopModal() {
     }
 
     closeStopConfirmModal();
-    openRepairModal(machineId, "unlock");
+    openModeratorCodeModal("collect", machineId);
 }
 
 /** Validates the collection details and stops the current session if they match. */
@@ -2266,35 +2316,11 @@ async function submitStartSession(event) {
 
 /** Completes an expired session on the backend and clears local countdown state. */
 async function completeSessionForMachine(machine) {
-    const meta = state.sessionMetaByMachineId[machine.id];
-    if (!meta || !meta.sessionId) {
-        clearSessionMeta(machine.id);
-        return;
-    }
-
-    if (state.pendingSessionCompletionIds.has(meta.sessionId)) {
-        return;
-    }
-
-    state.pendingSessionCompletionIds.add(meta.sessionId);
-    try {
-        await api.endSession(meta.sessionId);
-        clearSessionMeta(machine.id);
-        await refreshDashboardData();
-        showToast("Laundry session finished", "success");
-    } catch (err) {
-        showToast(`Could not complete session automatically: ${err.message}`, "error");
-    } finally {
-        state.pendingSessionCompletionIds.delete(meta.sessionId);
-    }
+    return machine;
 }
 
 function checkAndCompleteExpiredSessions() {
-    state.machineViewModels
-        .filter(machine => machine.status === "in-use" && Number.isFinite(machine.remainingSeconds) && machine.remainingSeconds <= 0)
-        .forEach(machine => {
-            void completeSessionForMachine(machine);
-        });
+    return;
 }
 
 /** Stops a running session manually, with optional toast suppression. */

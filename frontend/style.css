@@ -844,6 +844,11 @@ body::after {
     color: var(--maintenance-text);
 }
 
+.waiting-collection {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
 .machine-actions {
     margin-top: 18px;
     display: flex;
