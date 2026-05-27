@@ -520,7 +520,7 @@ function formatInstallationDate(isoDate) {
     if (!isoDate) return "Unknown";
     const parsed = new Date(isoDate);
     if (!Number.isFinite(parsed.getTime())) return "Unknown";
-    return parsed.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+    return parsed.toLocaleDateString('en-US', { year: "numeric", month: "short", day: "numeric" });
 }
 
 /** Formats the approximate age of a machine since installation. */
@@ -544,6 +544,9 @@ function formatMachineAge(isoDate) {
  */
 function getStatusLabel(status) {
     if (status === "in-use") {
+        return "In Use";
+    }
+    if (status === "waiting-collection") {
         return "In Use";
     }
     if (status === "maintenance") {
