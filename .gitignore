@@ -1,5 +1,4 @@
 # Environment variables with sensitive data
-backend/.env
 
 # Node.js
 node_modules/

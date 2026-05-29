@@ -13,7 +13,6 @@ const express = require('express');
 const mssql = require('mssql');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
 
 // =========================================================
 // EXPRESS APPLICATION CONFIGURATION

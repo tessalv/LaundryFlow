@@ -64,40 +64,49 @@ cd laundryflow-app
 
 ### 2. Configure environment variables
 
-The application requires a `.env` file inside the `backend/` directory.  
-This file contains sensitive information such as database credentials and is **not committed to the repository** for security reasons.
+The application reads its configuration from process environment variables.  
+For Docker Compose, export them in your shell or define them in your CI/CD workflow before starting the stack.
 
-A template is provided. Copy it and fill in your values:
+If you use GitHub Actions, create these repository variables and secrets so the workflow can map them automatically:
 
-```bash
-cp backend/.env.example backend/.env
+```text
+GitHub Variables:
+NODE_ENV
+PORT
+DB_HOST
+DB_PORT
+DB_USER
+DB_NAME
+
+GitHub Secrets:
+DB_PASSWORD
+SA_PASSWORD
 ```
 
-Open `backend/.env` and configure:
-
-```dotenv
-NODE_ENV=development
-PORT=3000
-DB_HOST=mssql
-DB_PORT=1433
-DB_USER=sa
-DB_PASSWORD=YourPassword123!
-DB_NAME=LaundryFlowDB
+```powershell
+$env:NODE_ENV = "development"
+$env:PORT = "3000"
+$env:DB_HOST = "mssql"
+$env:DB_PORT = "1433"
+$env:DB_USER = "sa"
+$env:DB_PASSWORD = "YourPassword123!"
+$env:DB_NAME = "LaundryFlowDB"
+$env:SA_PASSWORD = "YourPassword123!"
 
 # Optional: legacy SMS / SMTP notifications
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=
-SMTP_PASS=
-NOTIFY_FROM_EMAIL=
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_FROM_NUMBER=
+$env:SMTP_HOST = ""
+$env:SMTP_PORT = "587"
+$env:SMTP_SECURE = "false"
+$env:SMTP_USER = ""
+$env:SMTP_PASS = ""
+$env:NOTIFY_FROM_EMAIL = ""
+$env:TWILIO_ACCOUNT_SID = ""
+$env:TWILIO_AUTH_TOKEN = ""
+$env:TWILIO_FROM_NUMBER = ""
 ```
 
 > The values above match the default Docker configuration and work out of the box.  
-> If you change `DB_PASSWORD`, update it consistently in `docker-compose.yml` as well.
+> If you change `DB_PASSWORD`, update it consistently for both the backend and SQL Server environment.
 
 > SMS notifications are optional. If the SMTP/Twilio variables are empty, the app will finish cycles normally but will not send alerts.
 
