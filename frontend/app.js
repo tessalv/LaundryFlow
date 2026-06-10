@@ -19,6 +19,9 @@ const REFRESH_INTERVAL_MS = 10000;
 /** Timer tick interval used to update countdowns on screen. */
 const SESSION_TIMER_TICK_MS = 1000;
 
+/** Delay shown before a session start is actually submitted. */
+const START_WARNING_DURATION_MS = 10000;
+
 /** Local storage key used to persist session countdown metadata. */
 const SESSION_META_STORAGE_KEY = "laundryflow_session_meta_v1";
 
@@ -50,6 +53,10 @@ const state = {
     activeUsageRange: "7d",
     activeUsageMachineId: "all",
     activeMaintenanceMachineId: "all",
+    activeStartWarningMachineId: null,
+    startWarningEndsAt: 0,
+    startWarningTimeoutId: null,
+    startWarningContext: null,
     timerNow: Date.now(),
     sessionMetaByMachineId: loadSessionMetaStore()
 };
@@ -115,13 +122,16 @@ const dom = {
     closeMaintenanceStatsBtn: document.getElementById("close-maintenance-stats-btn"),
     maintenanceMachineSelect: document.getElementById("maintenance-machine-select"),
     maintenanceStatsGrid: document.getElementById("maintenance-stats-grid"),
-    // notification elements removed
     startSessionModal: document.getElementById("start-session-modal"),
+    startSessionTitle: document.getElementById("start-session-title"),
     startMachineLabel: document.getElementById("start-machine-label"),
+    startWarningText: document.getElementById("start-warning-text"),
+    startSessionFormShell: document.getElementById("start-session-form-shell"),
     cancelStartBtn: document.getElementById("cancel-start-btn"),
     submitStartBtn: document.getElementById("submit-start-btn"),
     startSessionForm: document.getElementById("start-session-form"),
     startFormError: document.getElementById("start-form-error"),
+    startWarningBanner: document.getElementById("start-warning-banner"),
     // stop confirmation modal refs
     stopConfirmModal: document.getElementById("stop-confirm-modal"),
     stopConfirmForm: document.getElementById("stop-confirm-form"),
@@ -726,9 +736,10 @@ function renderMachineMeta(machine) {
  * Renders the action buttons for a machine card.
  * @param {Object} machine - Normalized machine view model.
  * @param {boolean} isSessionPending - Whether a start request is still pending.
+ * @param {number} startWarningRemainingSeconds - Remaining seconds before the session starts.
  * @returns {string} HTML markup for the action area.
  */
-function renderMachineActions(machine, isSessionPending) {
+function renderMachineActions(machine, isSessionPending, startWarningRemainingSeconds = 0) {
     if (machine.status === "maintenance") {
         return `
             <div class="machine-actions maintenance-actions">
@@ -782,7 +793,11 @@ function renderMachineActions(machine, isSessionPending) {
       `;
     }
 
-    const isStartDisabled = machine.status !== "available" || isSessionPending;
+    const isStartWarningActive = Number.isFinite(startWarningRemainingSeconds) && startWarningRemainingSeconds > 0;
+    const isStartDisabled = machine.status !== "available" || isSessionPending || isStartWarningActive;
+    const startLabel = isStartWarningActive
+        ? `Starting in ${startWarningRemainingSeconds}s...`
+        : (isSessionPending ? "Starting..." : "Start");
     return `
     <div class="machine-actions">
       <button
@@ -791,7 +806,7 @@ function renderMachineActions(machine, isSessionPending) {
         data-machine-id="${machine.id}"
         ${isStartDisabled ? "disabled" : ""}
       >
-        ${isSessionPending ? "Starting..." : "Start"}
+                ${startLabel}
       </button>
 
       <button
@@ -802,6 +817,17 @@ function renderMachineActions(machine, isSessionPending) {
         Report
       </button>
     </div>
+    `;
+}
+
+/** Renders a temporary warning card shown while a session start is counting down. */
+function renderStartWarningCard(machine, remainingSeconds) {
+    return `
+        <div class="machine-card start-warning-card" role="status" aria-live="polite">
+            <div class="start-warning-chip">Warning</div>
+            <h4>Starting ${machine.name}</h4>
+            <p>The session will be created in ${remainingSeconds}s.</p>
+        </div>
     `;
 }
 
@@ -821,14 +847,12 @@ function renderMachines() {
     }
 
     const cards = [];
-    const adHtml = `
-                <div class="machine-card ad-card">
-                    <div class="ad-content">Advertisement — Special offer</div>
-                </div>
-        `;
+    const activeWarningMachineId = state.activeStartWarningMachineId;
+    const activeWarningRemainingSeconds = getStartWarningRemainingSeconds();
 
-    state.machineViewModels.forEach((machine, idx) => {
+    state.machineViewModels.forEach(machine => {
         const isSessionPending = state.pendingSessionMachineIds.has(machine.id);
+        const isStartWarningActive = activeWarningMachineId === machine.id && activeWarningRemainingSeconds > 0;
         const isWaitingCollection = Number.isFinite(machine.remainingSeconds) && machine.remainingSeconds <= 0;
         const cardStatusClass = isWaitingCollection ? "status-waiting-collection" : `status-${machine.status}`;
         const machineHtml = `
@@ -853,22 +877,16 @@ function renderMachines() {
                     <p>${getMachineHint(machine.status, isWaitingCollection)}</p>
                     ${renderMachineMeta(machine)}
                     ${renderRunningPanel(machine)}
-                    ${renderMachineActions(machine, isSessionPending)}
+                    ${renderMachineActions(machine, isSessionPending, isStartWarningActive ? activeWarningRemainingSeconds : 0)}
                 </div>
             `;
 
         cards.push(machineHtml);
 
-        // Insert ad card between machines (not after the last one)
-        if (idx < state.machineViewModels.length - 1) {
-            cards.push(adHtml);
+        if (isStartWarningActive) {
+            cards.push(renderStartWarningCard(machine, activeWarningRemainingSeconds));
         }
     });
-
-    // If total boxes is odd, append one ad card to make it even
-    if (cards.length % 2 === 1) {
-        cards.push(adHtml);
-    }
 
     dom.machinesGrid.innerHTML = cards.join("");
 }
@@ -1292,11 +1310,93 @@ function renderNotificationCount() {
     // notification count removed
 }
 
+/** Returns the remaining seconds for the active start warning, if any. */
+function getStartWarningRemainingSeconds() {
+    if (!state.activeStartWarningMachineId || !Number.isFinite(state.startWarningEndsAt)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.ceil((state.startWarningEndsAt - state.timerNow) / 1000));
+}
+
+/** Resets the temporary start warning state. */
+function clearStartWarningState() {
+    if (state.startWarningTimeoutId) {
+        window.clearTimeout(state.startWarningTimeoutId);
+    }
+
+    state.activeStartWarningMachineId = null;
+    state.startWarningEndsAt = 0;
+    state.startWarningTimeoutId = null;
+    state.startWarningContext = null;
+}
+
+/** Updates the start warning block and form visibility inside the modal. */
+function syncStartSessionIntroState() {
+    if (!dom.startWarningBanner || !dom.startSessionFormShell) {
+        return;
+    }
+
+    const remainingSeconds = getStartWarningRemainingSeconds();
+    const isWarningActive = Boolean(state.activeStartMachineId && remainingSeconds > 0);
+    const shouldShowForm = Boolean(state.activeStartMachineId && !isWarningActive);
+
+    if (dom.startSessionTitle) {
+        dom.startSessionTitle.classList.toggle("start-intro-hidden", isWarningActive);
+    }
+
+    if (dom.startMachineLabel) {
+        dom.startMachineLabel.classList.toggle("start-intro-hidden", isWarningActive);
+    }
+
+    if (!isWarningActive) {
+        dom.startWarningBanner.innerHTML = "";
+        dom.startWarningBanner.classList.remove("show");
+    } else {
+        dom.startWarningBanner.innerHTML = `
+            <div class="start-warning-title">Advertissement - Special offer</div>
+            <div class="start-warning-text">Please wait ${remainingSeconds}s before the form appears.</div>
+        `;
+        dom.startWarningBanner.classList.add("show");
+    }
+
+    dom.startSessionFormShell.classList.toggle("is-hidden", !shouldShowForm);
+    dom.startSessionFormShell.setAttribute("aria-hidden", shouldShowForm ? "false" : "true");
+}
+
+/** Synchronizes the start modal submit button with the active countdown state. */
+function syncStartSessionSubmitButton() {
+    if (!dom.submitStartBtn) {
+        return;
+    }
+
+    const remainingSeconds = getStartWarningRemainingSeconds();
+
+    if (state.activeStartMachineId && state.activeStartWarningMachineId === state.activeStartMachineId && remainingSeconds > 0) {
+        dom.submitStartBtn.disabled = true;
+        dom.submitStartBtn.textContent = remainingSeconds > 0
+            ? `Starting in ${remainingSeconds}s...`
+            : "Starting...";
+        return;
+    }
+
+    if (state.activeStartMachineId && state.pendingSessionMachineIds.has(state.activeStartMachineId)) {
+        dom.submitStartBtn.disabled = true;
+        dom.submitStartBtn.textContent = "Starting...";
+        return;
+    }
+
+    dom.submitStartBtn.disabled = false;
+    dom.submitStartBtn.textContent = "Start Session";
+}
+
 /** Renders the complete dashboard view. */
 function renderAll() {
     renderStats();
     renderUsageStats();
     renderMaintenanceStats();
+    syncStartSessionIntroState();
+    syncStartSessionSubmitButton();
     renderMachines();
     renderIssues();
 }
@@ -2045,6 +2145,20 @@ function clearStartFormErrors() {
     dom.startFormError.classList.remove("show");
 }
 
+/** Returns the default cycle duration for a machine type. */
+function getDefaultSessionDurationMinutes(machineType) {
+    if (window.LaundryFlowCycleLab && typeof window.LaundryFlowCycleLab.estimateDefaultSessionDurationMinutes === "function") {
+        return window.LaundryFlowCycleLab.estimateDefaultSessionDurationMinutes(machineType);
+    }
+
+    const normalizedType = String(machineType || "").trim().toLowerCase();
+    if (normalizedType === "washer") {
+        return 70;
+    }
+
+    return 60;
+}
+
 /** Opens the start session modal for an available machine. */
 function openStartSessionModal(machineId) {
     const machine = state.machineViewModels.find(item => item.id === machineId);
@@ -2057,24 +2171,38 @@ function openStartSessionModal(machineId) {
     }
 
     state.activeStartMachineId = machineId;
+    clearStartWarningState();
+    state.activeStartWarningMachineId = machineId;
+    state.startWarningEndsAt = Date.now() + START_WARNING_DURATION_MS;
     clearStartFormErrors();
+    dom.startSessionFormShell.classList.add("is-hidden");
     dom.startSessionForm.reset();
     dom.startMachineLabel.textContent = `Machine: ${machine.name}`;
     dom.startSessionModal.classList.add("open");
     dom.startSessionModal.setAttribute("aria-hidden", "false");
 
-    const firstField = dom.startSessionForm.elements.namedItem("firstName");
-    if (firstField instanceof HTMLElement) {
-        firstField.focus();
-    }
+    syncStartSessionIntroState();
+    syncStartSessionSubmitButton();
+    renderMachines();
+
+    state.startWarningTimeoutId = window.setTimeout(() => {
+        state.activeStartWarningMachineId = null;
+        state.startWarningEndsAt = 0;
+        state.startWarningTimeoutId = null;
+        syncStartSessionIntroState();
+        syncStartSessionSubmitButton();
+    }, START_WARNING_DURATION_MS);
 }
 
 /** Closes the start session modal and resets validation state. */
 function closeStartSessionModal() {
     state.activeStartMachineId = null;
+    clearStartWarningState();
     clearStartFormErrors();
+    syncStartSessionIntroState();
     dom.startSessionModal.classList.remove("open");
     dom.startSessionModal.setAttribute("aria-hidden", "true");
+    syncStartSessionSubmitButton();
 }
 
 // =========================================================
@@ -2090,8 +2218,7 @@ function getStartFormValues() {
         phoneNumber: String(dom.startSessionForm.elements.namedItem("phoneNumber").value || "").trim(),
         apartmentNumber: String(dom.startSessionForm.elements.namedItem("apartmentNumber").value || "").trim(),
         roomNumber: String(dom.startSessionForm.elements.namedItem("roomNumber").value || "").trim(),
-        countryCode: String(dom.startSessionForm.elements.namedItem("countryCode") ? dom.startSessionForm.elements.namedItem("countryCode").value : "+33").trim(),
-        durationTime: String(dom.startSessionForm.elements.namedItem("durationTime") ? dom.startSessionForm.elements.namedItem("durationTime").value : "").trim()
+        countryCode: String(dom.startSessionForm.elements.namedItem("countryCode") ? dom.startSessionForm.elements.namedItem("countryCode").value : "+33").trim()
     };
 }
 
@@ -2101,7 +2228,6 @@ function validateStartForm(values) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^\+?[0-9().\-\s]{7,20}$/;
     const countryCodeRegex = /^\+\d{1,4}$/;
-    const durationRegex = /^\d{1,3}:[0-5]\d$/;
 
     if (!values.firstName) {
         errors.firstName = "First name is required.";
@@ -2131,18 +2257,13 @@ function validateStartForm(values) {
     if (!values.roomNumber) {
         errors.roomNumber = "Room number is required.";
     }
-    if (!values.durationTime) {
-        errors.durationTime = "Duration is required.";
-    } else if (!durationRegex.test(values.durationTime)) {
-        errors.durationTime = "Please enter a valid duration in hh:mm format.";
-    }
 
     return errors;
 }
 
 /** Applies start-session validation messages to the form UI. */
 function showStartFormValidation(errors) {
-    const fields = ["firstName", "lastName", "email", "countryCode", "phoneNumber", "apartmentNumber", "roomNumber", "durationTime"];
+    const fields = ["firstName", "lastName", "email", "countryCode", "phoneNumber", "apartmentNumber", "roomNumber"];
     fields.forEach(field => {
         setStartFormFieldError(field, errors[field] || "");
     });
@@ -2261,20 +2382,20 @@ async function submitStartSession(event) {
         return;
     }
 
+    const remainingSeconds = getStartWarningRemainingSeconds();
+    if (remainingSeconds > 0) {
+        showToast(`Please wait ${remainingSeconds}s before the form appears.`, "error");
+        return;
+    }
+
     state.pendingSessionMachineIds.add(machineId);
-    dom.submitStartBtn.disabled = true;
-    dom.submitStartBtn.textContent = "Starting...";
+    syncStartSessionSubmitButton();
     renderMachines();
 
     try {
         const roomId = await ensureRoomId(values.apartmentNumber, values.roomNumber);
         const user = await createOrRetrieveUser(values, roomId);
-
-        const durationMatch = values.durationTime.match(/^(\d{1,3}):([0-5]\d)$/);
-        if (!durationMatch) {
-            throw new Error("Please enter a valid duration in hh:mm format.");
-        }
-        const durationMinutes = (Number(durationMatch[1]) * 60) + Number(durationMatch[2]);
+        const durationMinutes = getDefaultSessionDurationMinutes(machine.type, machine.id, machine.name);
 
         await api.createSession(machineId, user.id);
 
@@ -2307,8 +2428,7 @@ async function submitStartSession(event) {
         showToast(`Could not start session: ${err.message}`, "error");
     } finally {
         state.pendingSessionMachineIds.delete(machineId);
-        dom.submitStartBtn.disabled = false;
-        dom.submitStartBtn.textContent = "Start Session";
+        syncStartSessionSubmitButton();
         renderMachines();
     }
 }
@@ -2728,6 +2848,8 @@ async function initApp() {
         state.timerNow = Date.now();
         buildMachineViewModels();
         checkAndCompleteExpiredSessions();
+        syncStartSessionIntroState();
+        syncStartSessionSubmitButton();
         renderMachines();
     }, SESSION_TIMER_TICK_MS);
 }

@@ -712,19 +712,6 @@ body::after {
     position: relative;
 }
 
-/* Inline ad card inside machines grid */
-.machine-card.ad-card {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 140px;
-    background: linear-gradient(180deg, #ffffff, #fffafc);
-    border: 1px dashed rgba(54, 95, 179, 0.15);
-    color: var(--text-color-secondary);
-    font-weight: 700;
-    font-size: 14px;
-}
-
 .machine-card.status-available {
     background: linear-gradient(180deg, #f0fdf4 0%, #fbfffc 100%);
     border-color: #bbf7d0;
@@ -743,6 +730,42 @@ body::after {
 .machine-card.status-waiting-collection {
     background: linear-gradient(180deg, #fffbeb 0%, #fffdf5 100%);
     border-color: #fbbf24;
+}
+
+.machine-card.start-warning-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 140px;
+    background: linear-gradient(180deg, #fff7ed 0%, #fffdf8 100%);
+    border: 1px solid #fdba74;
+    box-shadow: 0 16px 30px rgba(234, 88, 12, 0.08);
+}
+
+.start-warning-card h4 {
+    margin: 0;
+    font-size: 18px;
+    color: #9a3412;
+}
+
+.start-warning-card p {
+    margin: 0;
+    color: #9a3412;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.start-warning-chip {
+    display: inline-flex;
+    align-self: flex-start;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(234, 88, 12, 0.12);
+    color: #c2410c;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
 }
 
 .machine-card:hover {
@@ -1197,6 +1220,46 @@ tbody tr {
     color: var(--text-color-secondary);
     margin-top: 6px;
     margin-bottom: 16px;
+}
+
+.start-warning-banner {
+    display: none;
+    margin: 0 0 16px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+    color: #111827;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.start-warning-banner.show {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.start-warning-title {
+    font-size: 15px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #111827;
+}
+
+.start-warning-text {
+    font-size: 14px;
+    color: #374151;
+}
+
+.start-form-shell.is-hidden {
+    display: none;
+}
+
+.start-intro-hidden {
+    display: none;
 }
 
 .field-label {

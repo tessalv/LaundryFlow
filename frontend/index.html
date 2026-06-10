@@ -232,68 +232,69 @@
     <!-- Session start modal -->
     <div id="start-session-modal" class="modal-overlay" aria-hidden="true">
         <div class="modal-card start-modal-card" role="dialog" aria-modal="true" aria-labelledby="start-session-title">
-            <h3 id="start-session-title">Start Laundry Session</h3>
-            <p id="start-machine-label" class="modal-subtitle"></p>
+            <h3 id="start-session-title" class="start-intro-hidden">Start Laundry Session</h3>
+            <p id="start-machine-label" class="modal-subtitle start-intro-hidden">Enter your contact details to start
+                the session.</p>
+            <div id="start-warning-banner" class="start-warning-banner" aria-live="polite">
+                <div class="start-warning-title">Advertissement - Special offer</div>
+                <div id="start-warning-text" class="start-warning-text">Please wait 10s before the form appears.</div>
+            </div>
 
-            <form id="start-session-form" novalidate>
-                <div id="start-form-error" class="form-error-banner" aria-live="polite"></div>
+            <div id="start-session-form-shell" class="start-form-shell is-hidden" aria-hidden="true">
+                <form id="start-session-form" novalidate>
+                    <div id="start-form-error" class="form-error-banner" aria-live="polite"></div>
 
-                <div class="form-grid">
-                    <div class="field-group">
-                        <label for="first-name" class="field-label">First Name</label>
-                        <input id="first-name" name="firstName" type="text" autocomplete="given-name" required />
-                        <p class="field-error" data-error-for="firstName"></p>
-                    </div>
-
-                    <div class="field-group">
-                        <label for="last-name" class="field-label">Last Name</label>
-                        <input id="last-name" name="lastName" type="text" autocomplete="family-name" required />
-                        <p class="field-error" data-error-for="lastName"></p>
-                    </div>
-
-                    <div class="field-group field-group-full">
-                        <label for="email-address" class="field-label">Email Address</label>
-                        <input id="email-address" name="email" type="email" autocomplete="email" required />
-                        <p class="field-error" data-error-for="email"></p>
-                    </div>
-
-                    <div class="field-group field-group-full">
-                        <label for="phone-number" class="field-label">Phone Number</label>
-                        <div class="phone-input-row">
-                            <input id="country-code" name="countryCode" class="phone-code-input" type="tel"
-                                inputmode="tel" placeholder="+xx" aria-label="Country code" />
-                            <input id="phone-number" name="phoneNumber" class="phone-number-input" type="tel"
-                                autocomplete="tel" placeholder="Phone number" required />
+                    <div class="form-grid">
+                        <div class="field-group">
+                            <label for="first-name" class="field-label">First Name</label>
+                            <input id="first-name" name="firstName" type="text" autocomplete="given-name" required />
+                            <p class="field-error" data-error-for="firstName"></p>
                         </div>
-                        <p class="field-error" data-error-for="countryCode"></p>
-                        <p class="field-error" data-error-for="phoneNumber"></p>
+
+                        <div class="field-group">
+                            <label for="last-name" class="field-label">Last Name</label>
+                            <input id="last-name" name="lastName" type="text" autocomplete="family-name" required />
+                            <p class="field-error" data-error-for="lastName"></p>
+                        </div>
+
+                        <div class="field-group field-group-full">
+                            <label for="email-address" class="field-label">Email Address</label>
+                            <input id="email-address" name="email" type="email" autocomplete="email" required />
+                            <p class="field-error" data-error-for="email"></p>
+                        </div>
+
+                        <div class="field-group field-group-full">
+                            <label for="phone-number" class="field-label">Phone Number</label>
+                            <div class="phone-input-row">
+                                <input id="country-code" name="countryCode" class="phone-code-input" type="tel"
+                                    inputmode="tel" placeholder="+xx" aria-label="Country code" />
+                                <input id="phone-number" name="phoneNumber" class="phone-number-input" type="tel"
+                                    autocomplete="tel" placeholder="Phone number" required />
+                            </div>
+                            <p class="field-error" data-error-for="countryCode"></p>
+                            <p class="field-error" data-error-for="phoneNumber"></p>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="apartment-number" class="field-label">Apartment Number</label>
+                            <input id="apartment-number" name="apartmentNumber" type="text" required />
+                            <p class="field-error" data-error-for="apartmentNumber"></p>
+                        </div>
+
+                        <div class="field-group">
+                            <label for="room-number" class="field-label">Room Number</label>
+                            <input id="room-number" name="roomNumber" type="text" required />
+                            <p class="field-error" data-error-for="roomNumber"></p>
+                        </div>
+
                     </div>
 
-                    <div class="field-group">
-                        <label for="apartment-number" class="field-label">Apartment Number</label>
-                        <input id="apartment-number" name="apartmentNumber" type="text" required />
-                        <p class="field-error" data-error-for="apartmentNumber"></p>
+                    <div class="modal-actions">
+                        <button id="cancel-start-btn" class="report-btn" type="button">Cancel</button>
+                        <button id="submit-start-btn" class="start-btn" type="submit">Start Session</button>
                     </div>
-
-                    <div class="field-group">
-                        <label for="room-number" class="field-label">Room Number</label>
-                        <input id="room-number" name="roomNumber" type="text" required />
-                        <p class="field-error" data-error-for="roomNumber"></p>
-                    </div>
-
-                    <div class="field-group field-group-full">
-                        <label for="duration-time" class="field-label">Machine Duration (hh:mm)</label>
-                        <input id="duration-time" name="durationTime" type="text" inputmode="numeric"
-                            placeholder="00:00" required />
-                        <p class="field-error" data-error-for="durationTime"></p>
-                    </div>
-                </div>
-
-                <div class="modal-actions">
-                    <button id="cancel-start-btn" class="report-btn" type="button">Cancel</button>
-                    <button id="submit-start-btn" class="start-btn" type="submit">Start Session</button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -412,6 +413,7 @@
         </div>
     </div>
 
+    <script src="prediction.js"></script>
     <script src="app.js"></script>
 </body>
 
