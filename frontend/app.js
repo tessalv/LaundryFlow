@@ -1,4 +1,4 @@
-/**
+﻿/**
  * =========================================================
  * LaundryFlow Frontend Application
  * =========================================================
@@ -18,9 +18,6 @@ const REFRESH_INTERVAL_MS = 10000;
 
 /** Timer tick interval used to update countdowns on screen. */
 const SESSION_TIMER_TICK_MS = 1000;
-
-/** Delay shown before a session start is actually submitted. */
-const START_WARNING_DURATION_MS = 10000;
 
 /** Local storage key used to persist session countdown metadata. */
 const SESSION_META_STORAGE_KEY = "laundryflow_session_meta_v1";
@@ -53,10 +50,6 @@ const state = {
     activeUsageRange: "7d",
     activeUsageMachineId: "all",
     activeMaintenanceMachineId: "all",
-    activeStartWarningMachineId: null,
-    startWarningEndsAt: 0,
-    startWarningTimeoutId: null,
-    startWarningContext: null,
     timerNow: Date.now(),
     sessionMetaByMachineId: loadSessionMetaStore()
 };
@@ -116,22 +109,23 @@ const dom = {
     usagePeakCount: document.getElementById("usage-peak-count"),
     usageAverageCount: document.getElementById("usage-average-count"),
     usageChart: document.getElementById("usage-chart"),
+    wattageChart: document.getElementById("wattage-chart"),
+    apartmentWattageList: document.getElementById("apartment-wattage-list"),
     usageRangeButtons: Array.from(document.querySelectorAll("[data-usage-range]")),
     maintenanceStatsButton: document.getElementById("maintenance-stats-btn"),
     maintenanceStatsModal: document.getElementById("maintenance-stats-modal"),
     closeMaintenanceStatsBtn: document.getElementById("close-maintenance-stats-btn"),
     maintenanceMachineSelect: document.getElementById("maintenance-machine-select"),
     maintenanceStatsGrid: document.getElementById("maintenance-stats-grid"),
+    // notification elements removed
+    advertisementModal: document.getElementById("advertisement-modal"),
+    adCountdown: document.getElementById("ad-countdown"),
     startSessionModal: document.getElementById("start-session-modal"),
-    startSessionTitle: document.getElementById("start-session-title"),
     startMachineLabel: document.getElementById("start-machine-label"),
-    startWarningText: document.getElementById("start-warning-text"),
-    startSessionFormShell: document.getElementById("start-session-form-shell"),
     cancelStartBtn: document.getElementById("cancel-start-btn"),
     submitStartBtn: document.getElementById("submit-start-btn"),
     startSessionForm: document.getElementById("start-session-form"),
     startFormError: document.getElementById("start-form-error"),
-    startWarningBanner: document.getElementById("start-warning-banner"),
     // stop confirmation modal refs
     stopConfirmModal: document.getElementById("stop-confirm-modal"),
     stopConfirmForm: document.getElementById("stop-confirm-form"),
@@ -736,10 +730,9 @@ function renderMachineMeta(machine) {
  * Renders the action buttons for a machine card.
  * @param {Object} machine - Normalized machine view model.
  * @param {boolean} isSessionPending - Whether a start request is still pending.
- * @param {number} startWarningRemainingSeconds - Remaining seconds before the session starts.
  * @returns {string} HTML markup for the action area.
  */
-function renderMachineActions(machine, isSessionPending, startWarningRemainingSeconds = 0) {
+function renderMachineActions(machine, isSessionPending) {
     if (machine.status === "maintenance") {
         return `
             <div class="machine-actions maintenance-actions">
@@ -793,11 +786,7 @@ function renderMachineActions(machine, isSessionPending, startWarningRemainingSe
       `;
     }
 
-    const isStartWarningActive = Number.isFinite(startWarningRemainingSeconds) && startWarningRemainingSeconds > 0;
-    const isStartDisabled = machine.status !== "available" || isSessionPending || isStartWarningActive;
-    const startLabel = isStartWarningActive
-        ? `Starting in ${startWarningRemainingSeconds}s...`
-        : (isSessionPending ? "Starting..." : "Start");
+    const isStartDisabled = machine.status !== "available" || isSessionPending;
     return `
     <div class="machine-actions">
       <button
@@ -806,7 +795,7 @@ function renderMachineActions(machine, isSessionPending, startWarningRemainingSe
         data-machine-id="${machine.id}"
         ${isStartDisabled ? "disabled" : ""}
       >
-                ${startLabel}
+        ${isSessionPending ? "Starting..." : "Start"}
       </button>
 
       <button
@@ -817,17 +806,6 @@ function renderMachineActions(machine, isSessionPending, startWarningRemainingSe
         Report
       </button>
     </div>
-    `;
-}
-
-/** Renders a temporary warning card shown while a session start is counting down. */
-function renderStartWarningCard(machine, remainingSeconds) {
-    return `
-        <div class="machine-card start-warning-card" role="status" aria-live="polite">
-            <div class="start-warning-chip">Warning</div>
-            <h4>Starting ${machine.name}</h4>
-            <p>The session will be created in ${remainingSeconds}s.</p>
-        </div>
     `;
 }
 
@@ -847,12 +825,9 @@ function renderMachines() {
     }
 
     const cards = [];
-    const activeWarningMachineId = state.activeStartWarningMachineId;
-    const activeWarningRemainingSeconds = getStartWarningRemainingSeconds();
 
-    state.machineViewModels.forEach(machine => {
+    state.machineViewModels.forEach((machine, idx) => {
         const isSessionPending = state.pendingSessionMachineIds.has(machine.id);
-        const isStartWarningActive = activeWarningMachineId === machine.id && activeWarningRemainingSeconds > 0;
         const isWaitingCollection = Number.isFinite(machine.remainingSeconds) && machine.remainingSeconds <= 0;
         const cardStatusClass = isWaitingCollection ? "status-waiting-collection" : `status-${machine.status}`;
         const machineHtml = `
@@ -863,9 +838,7 @@ function renderMachines() {
                         aria-label="Delete machine ${machine.name}"
                         data-action="delete"
                         data-machine-id="${machine.id}"
-                    >
-                        ×
-                    </button>
+                    >&times;</button>
                     <div class="machine-header">
                         <div>
                             <h3>${machine.name}</h3>
@@ -877,15 +850,11 @@ function renderMachines() {
                     <p>${getMachineHint(machine.status, isWaitingCollection)}</p>
                     ${renderMachineMeta(machine)}
                     ${renderRunningPanel(machine)}
-                    ${renderMachineActions(machine, isSessionPending, isStartWarningActive ? activeWarningRemainingSeconds : 0)}
+                    ${renderMachineActions(machine, isSessionPending)}
                 </div>
             `;
 
         cards.push(machineHtml);
-
-        if (isStartWarningActive) {
-            cards.push(renderStartWarningCard(machine, activeWarningRemainingSeconds));
-        }
     });
 
     dom.machinesGrid.innerHTML = cards.join("");
@@ -1146,6 +1115,9 @@ function renderUsageStats() {
             button.classList.toggle("active", button.dataset.usageRange === state.activeUsageRange);
         });
     }
+
+    renderWattageStats();
+
 }
 
 /** Formats a duration since a timestamp as a compact human-readable label. */
@@ -1310,93 +1282,11 @@ function renderNotificationCount() {
     // notification count removed
 }
 
-/** Returns the remaining seconds for the active start warning, if any. */
-function getStartWarningRemainingSeconds() {
-    if (!state.activeStartWarningMachineId || !Number.isFinite(state.startWarningEndsAt)) {
-        return 0;
-    }
-
-    return Math.max(0, Math.ceil((state.startWarningEndsAt - state.timerNow) / 1000));
-}
-
-/** Resets the temporary start warning state. */
-function clearStartWarningState() {
-    if (state.startWarningTimeoutId) {
-        window.clearTimeout(state.startWarningTimeoutId);
-    }
-
-    state.activeStartWarningMachineId = null;
-    state.startWarningEndsAt = 0;
-    state.startWarningTimeoutId = null;
-    state.startWarningContext = null;
-}
-
-/** Updates the start warning block and form visibility inside the modal. */
-function syncStartSessionIntroState() {
-    if (!dom.startWarningBanner || !dom.startSessionFormShell) {
-        return;
-    }
-
-    const remainingSeconds = getStartWarningRemainingSeconds();
-    const isWarningActive = Boolean(state.activeStartMachineId && remainingSeconds > 0);
-    const shouldShowForm = Boolean(state.activeStartMachineId && !isWarningActive);
-
-    if (dom.startSessionTitle) {
-        dom.startSessionTitle.classList.toggle("start-intro-hidden", isWarningActive);
-    }
-
-    if (dom.startMachineLabel) {
-        dom.startMachineLabel.classList.toggle("start-intro-hidden", isWarningActive);
-    }
-
-    if (!isWarningActive) {
-        dom.startWarningBanner.innerHTML = "";
-        dom.startWarningBanner.classList.remove("show");
-    } else {
-        dom.startWarningBanner.innerHTML = `
-            <div class="start-warning-title">Advertissement - Special offer</div>
-            <div class="start-warning-text">Please wait ${remainingSeconds}s before the form appears.</div>
-        `;
-        dom.startWarningBanner.classList.add("show");
-    }
-
-    dom.startSessionFormShell.classList.toggle("is-hidden", !shouldShowForm);
-    dom.startSessionFormShell.setAttribute("aria-hidden", shouldShowForm ? "false" : "true");
-}
-
-/** Synchronizes the start modal submit button with the active countdown state. */
-function syncStartSessionSubmitButton() {
-    if (!dom.submitStartBtn) {
-        return;
-    }
-
-    const remainingSeconds = getStartWarningRemainingSeconds();
-
-    if (state.activeStartMachineId && state.activeStartWarningMachineId === state.activeStartMachineId && remainingSeconds > 0) {
-        dom.submitStartBtn.disabled = true;
-        dom.submitStartBtn.textContent = remainingSeconds > 0
-            ? `Starting in ${remainingSeconds}s...`
-            : "Starting...";
-        return;
-    }
-
-    if (state.activeStartMachineId && state.pendingSessionMachineIds.has(state.activeStartMachineId)) {
-        dom.submitStartBtn.disabled = true;
-        dom.submitStartBtn.textContent = "Starting...";
-        return;
-    }
-
-    dom.submitStartBtn.disabled = false;
-    dom.submitStartBtn.textContent = "Start Session";
-}
-
 /** Renders the complete dashboard view. */
 function renderAll() {
     renderStats();
     renderUsageStats();
     renderMaintenanceStats();
-    syncStartSessionIntroState();
-    syncStartSessionSubmitButton();
     renderMachines();
     renderIssues();
 }
@@ -1520,7 +1410,7 @@ function updateAddMachinePreview() {
         dom.addMachineInstalledAt.title = `Example: ${defaults.installedAt}`;
     }
 
-    dom.addMachinePreview.textContent = `New machine name: ${machineName} · ${defaults.brand} · ${defaults.reference}`;
+    dom.addMachinePreview.textContent = `New machine name: ${machineName} ? ${defaults.brand} ? ${defaults.reference}`;
     if (dom.addMachinePreview) dom.addMachinePreview.classList.add('example');
 
     // Remove example highlighting when the user starts typing
@@ -2101,11 +1991,11 @@ async function submitStopConfirm(event) {
         if (ownerComposite !== expectedComposite) {
             setStopFormFieldError("confirmApartment", "Apartment/room do not match our records.");
             setStopFormFieldError("confirmRoom", "Apartment/room do not match our records.");
-            showToast("Verification failed — cannot stop session.", "error");
+            showToast("Verification failed ? cannot stop session.", "error");
             return;
         }
 
-        // verified — proceed to stop/collect
+        // verified ? proceed to stop/collect
         closeStopConfirmModal();
         await stopSession(machineId);
     } catch (err) {
@@ -2145,18 +2035,43 @@ function clearStartFormErrors() {
     dom.startFormError.classList.remove("show");
 }
 
-/** Returns the default cycle duration for a machine type. */
-function getDefaultSessionDurationMinutes(machineType) {
-    if (window.LaundryFlowCycleLab && typeof window.LaundryFlowCycleLab.estimateDefaultSessionDurationMinutes === "function") {
-        return window.LaundryFlowCycleLab.estimateDefaultSessionDurationMinutes(machineType);
+/** Opens the advertisement modal with countdown before showing start session modal. */
+function openAdvertisementModal(machineId) {
+    const machine = state.machineViewModels.find(item => item.id === machineId);
+    if (!machine) {
+        return;
+    }
+    if (machine.status !== "available") {
+        showToast("This machine cannot be started right now.", "error");
+        return;
     }
 
-    const normalizedType = String(machineType || "").trim().toLowerCase();
-    if (normalizedType === "washer") {
-        return 70;
-    }
+    state.activeStartMachineId = machineId;
 
-    return 60;
+    // Show advertisement modal
+    dom.advertisementModal.classList.add("open");
+    dom.advertisementModal.setAttribute("aria-hidden", "false");
+
+    // Start countdown from 10 seconds
+    let countdown = 10;
+    dom.adCountdown.textContent = countdown;
+
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+            dom.adCountdown.textContent = countdown;
+        } else {
+            clearInterval(countdownInterval);
+            closeAdvertisementModal();
+            openStartSessionModal(machineId);
+        }
+    }, 1000);
+}
+
+/** Closes the advertisement modal. */
+function closeAdvertisementModal() {
+    dom.advertisementModal.classList.remove("open");
+    dom.advertisementModal.setAttribute("aria-hidden", "true");
 }
 
 /** Opens the start session modal for an available machine. */
@@ -2171,38 +2086,24 @@ function openStartSessionModal(machineId) {
     }
 
     state.activeStartMachineId = machineId;
-    clearStartWarningState();
-    state.activeStartWarningMachineId = machineId;
-    state.startWarningEndsAt = Date.now() + START_WARNING_DURATION_MS;
     clearStartFormErrors();
-    dom.startSessionFormShell.classList.add("is-hidden");
     dom.startSessionForm.reset();
     dom.startMachineLabel.textContent = `Machine: ${machine.name}`;
     dom.startSessionModal.classList.add("open");
     dom.startSessionModal.setAttribute("aria-hidden", "false");
 
-    syncStartSessionIntroState();
-    syncStartSessionSubmitButton();
-    renderMachines();
-
-    state.startWarningTimeoutId = window.setTimeout(() => {
-        state.activeStartWarningMachineId = null;
-        state.startWarningEndsAt = 0;
-        state.startWarningTimeoutId = null;
-        syncStartSessionIntroState();
-        syncStartSessionSubmitButton();
-    }, START_WARNING_DURATION_MS);
+    const firstField = dom.startSessionForm.elements.namedItem("firstName");
+    if (firstField instanceof HTMLElement) {
+        firstField.focus();
+    }
 }
 
 /** Closes the start session modal and resets validation state. */
 function closeStartSessionModal() {
     state.activeStartMachineId = null;
-    clearStartWarningState();
     clearStartFormErrors();
-    syncStartSessionIntroState();
     dom.startSessionModal.classList.remove("open");
     dom.startSessionModal.setAttribute("aria-hidden", "true");
-    syncStartSessionSubmitButton();
 }
 
 // =========================================================
@@ -2218,7 +2119,8 @@ function getStartFormValues() {
         phoneNumber: String(dom.startSessionForm.elements.namedItem("phoneNumber").value || "").trim(),
         apartmentNumber: String(dom.startSessionForm.elements.namedItem("apartmentNumber").value || "").trim(),
         roomNumber: String(dom.startSessionForm.elements.namedItem("roomNumber").value || "").trim(),
-        countryCode: String(dom.startSessionForm.elements.namedItem("countryCode") ? dom.startSessionForm.elements.namedItem("countryCode").value : "+33").trim()
+        countryCode: String(dom.startSessionForm.elements.namedItem("countryCode") ? dom.startSessionForm.elements.namedItem("countryCode").value : "+33").trim(),
+
     };
 }
 
@@ -2228,6 +2130,7 @@ function validateStartForm(values) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^\+?[0-9().\-\s]{7,20}$/;
     const countryCodeRegex = /^\+\d{1,4}$/;
+    const durationRegex = /^\d{1,3}:[0-5]\d$/;
 
     if (!values.firstName) {
         errors.firstName = "First name is required.";
@@ -2243,13 +2146,13 @@ function validateStartForm(values) {
     if (!values.countryCode) {
         errors.countryCode = "Country code is required.";
     } else if (!countryCodeRegex.test(String(values.countryCode).trim())) {
-        errors.countryCode = "Country code must start with + and 1–4 digits (e.g. +33).";
+        errors.countryCode = "Country code must start with + and 1?4 digits (e.g. +33).";
     }
 
     if (!values.phoneNumber) {
         errors.phoneNumber = "Phone number is required.";
-    } else if (!phoneRegex.test((values.countryCode || "") + values.phoneNumber)) {
-        errors.phoneNumber = "Please enter a valid phone number including country code.";
+    } else if (!phoneRegex.test(values.phoneNumber)) {
+        errors.phoneNumber = "Please enter a valid phone number (7-20 digits, spaces, dashes or parentheses).";
     }
     if (!values.apartmentNumber) {
         errors.apartmentNumber = "Apartment number is required.";
@@ -2382,20 +2285,19 @@ async function submitStartSession(event) {
         return;
     }
 
-    const remainingSeconds = getStartWarningRemainingSeconds();
-    if (remainingSeconds > 0) {
-        showToast(`Please wait ${remainingSeconds}s before the form appears.`, "error");
-        return;
-    }
-
     state.pendingSessionMachineIds.add(machineId);
-    syncStartSessionSubmitButton();
+    dom.submitStartBtn.disabled = true;
+    dom.submitStartBtn.textContent = "Starting...";
     renderMachines();
 
     try {
         const roomId = await ensureRoomId(values.apartmentNumber, values.roomNumber);
         const user = await createOrRetrieveUser(values, roomId);
-        const durationMinutes = getDefaultSessionDurationMinutes(machine.type, machine.id, machine.name);
+
+        const durationMinutes = window.LaundryFlowCycleLab
+            ? window.LaundryFlowCycleLab.estimateDefaultSessionDurationMinutes(machine.type)
+            : 0;
+
 
         await api.createSession(machineId, user.id);
 
@@ -2428,7 +2330,8 @@ async function submitStartSession(event) {
         showToast(`Could not start session: ${err.message}`, "error");
     } finally {
         state.pendingSessionMachineIds.delete(machineId);
-        syncStartSessionSubmitButton();
+        dom.submitStartBtn.disabled = false;
+        dom.submitStartBtn.textContent = "Start Session";
         renderMachines();
     }
 }
@@ -2630,7 +2533,7 @@ function attachEventListeners() {
         }
 
         if (action === "start") {
-            openStartSessionModal(machineId);
+            openAdvertisementModal(machineId);
         }
 
         if (action === "repair") {
@@ -2831,6 +2734,219 @@ function attachEventListeners() {
     }
 }
 
+
+function buildWattageBuckets(rangeType) {
+    const config = getUsageRangeConfig(rangeType);
+
+    const buckets = Array.from(
+        { length: config.bucketCount },
+        (_, i) => ({
+            index: i,
+            startDate: config.bucketStart(i),
+            watts: 0,
+            label: config.bucketLabel(i)
+        })
+    );
+
+    const selectedMachineId = String(state.activeUsageMachineId);
+
+    const filteredSessions =
+        selectedMachineId === "all"
+            ? state.sessions
+            : state.sessions.filter(
+                session => session.machineId === Number(selectedMachineId)
+            );
+
+    filteredSessions.forEach(session => {
+        if (!session.startTime) {
+            return;
+        }
+
+        const sessionDate = new Date(session.startTime);
+
+        let bucketIndex = -1;
+
+        if (rangeType === "year") {
+            bucketIndex = sessionDate.getMonth();
+        }
+        else if (rangeType === "month") {
+            const startWindow = config.bucketStart(0);
+
+            const diffDays = Math.floor(
+                (sessionDate.getTime() - startWindow.getTime()) /
+                (24 * 60 * 60 * 1000)
+            );
+
+            bucketIndex = Math.floor(diffDays / 7);
+        }
+        else {
+            const startWindow = config.bucketStart(0);
+
+            bucketIndex = Math.floor(
+                (sessionDate.getTime() - startWindow.getTime()) /
+                (24 * 60 * 60 * 1000)
+            );
+        }
+
+        if (
+            bucketIndex >= 0 &&
+            bucketIndex < buckets.length
+        ) {
+            const startMs = new Date(session.startTime).getTime();
+            const endMs = session.endTime
+                ? new Date(session.endTime).getTime()
+                : Date.now();
+
+            const durationMinutes =
+                Math.max(1, endMs - startMs) / (60 * 1000);
+
+            const estimatedWatts = durationMinutes > 0 ? 1500 : 0;
+
+            buckets[bucketIndex].watts += estimatedWatts;
+        }
+    });
+
+    return buckets;
+}
+
+function buildApartmentWattageData() {
+    const roomWatts = {};
+
+    state.sessions.forEach(session => {
+        const user = state.users.find(u => u.id === session.userId);
+        const room = user
+            ? state.rooms.find(r => r.id === user.roomId)
+            : null;
+
+        const roomParts = room
+            ? splitCompositeRoomNumber(room.roomNumber)
+            : {};
+
+        const apartmentNumber =
+            roomParts.apartmentNumber || "Unknown";
+
+        const roomNumber =
+            roomParts.roomNumber || "Unknown";
+
+        const key = `Apartment ${apartmentNumber} - Room ${roomNumber}`;
+
+        const startMs = new Date(session.startTime).getTime();
+        const endMs = session.endTime
+            ? new Date(session.endTime).getTime()
+            : Date.now();
+
+        const durationMinutes =
+            Math.max(1, endMs - startMs) / (60 * 1000);
+
+        const estimatedWatts =
+            durationMinutes > 0 ? 1500 : 0;
+
+        if (!roomWatts[key]) {
+            roomWatts[key] = 0;
+        }
+
+        roomWatts[key] += estimatedWatts;
+    });
+
+    return roomWatts;
+}
+
+function renderWattageStats() {
+    const wattageBuckets = buildWattageBuckets(state.activeUsageRange);
+    const apartmentWatts = buildApartmentWattageData();
+
+    if (dom.wattageChart) {
+        const maxWatts =
+            wattageBuckets.length > 0
+                ? Math.max(
+                    1,
+                    Math.max(...wattageBuckets.map(bucket => bucket.watts))
+                )
+                : 1;
+
+        const config = getUsageRangeConfig(state.activeUsageRange);
+
+        dom.wattageChart.innerHTML = `
+            <div class="usage-chart-header">
+                <span class="usage-chart-title">${config.title}</span>
+                <span class="usage-chart-subtitle">
+                    Power consumed (Watts)
+                </span>
+            </div>
+
+            <div
+                class="usage-bars"
+                role="img"
+                aria-label="Power consumption chart"
+            >
+                ${wattageBuckets.map(bucket => `
+                    <div class="usage-bar-item">
+                        <div class="usage-bar-track">
+                            <div
+                                class="usage-bar-fill"
+                                style="height: ${Math.max(
+            8,
+            (bucket.watts / maxWatts) * 100
+        )}%;">
+                            </div>
+                        </div>
+
+                        <span class="usage-bar-value">
+                            ${Math.round(bucket.watts)}W
+                        </span>
+
+                        <span class="usage-bar-label">
+                            ${bucket.label}
+                        </span>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    }
+
+    if (dom.apartmentWattageList) {
+        const sortedApartments = Object.entries(apartmentWatts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([roomLabel, watts]) => `
+                <div
+                    style="
+                        display:flex;
+                        justify-content:space-between;
+                        align-items:center;
+                        padding:1rem;
+                        background:#f9f9f9;
+                        border:1px solid #e0e0e0;
+                        border-radius:8px;
+                    "
+                >
+                    <span
+                        style="
+                            font-weight:600;
+                            color:#333;
+                        "
+                    >
+                        ${roomLabel}
+                    </span>
+
+                    <span
+                        style="
+                            font-size:1.125rem;
+                            font-weight:700;
+                            color:#f26b6d;
+                        "
+                    >
+                        ${Math.round(watts)} W
+                    </span>
+                </div>
+            `)
+            .join("");
+
+        dom.apartmentWattageList.innerHTML =
+            sortedApartments || "<p>No data available</p>";
+    }
+}
+
+
 // =========================================================
 // APP BOOTSTRAPPING
 // =========================================================
@@ -2848,10 +2964,21 @@ async function initApp() {
         state.timerNow = Date.now();
         buildMachineViewModels();
         checkAndCompleteExpiredSessions();
-        syncStartSessionIntroState();
-        syncStartSessionSubmitButton();
         renderMachines();
     }, SESSION_TIMER_TICK_MS);
 }
 
 initApp();
+
+
+
+
+
+
+
+
+
+
+
+
+

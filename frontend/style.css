@@ -712,6 +712,19 @@ body::after {
     position: relative;
 }
 
+/* Inline ad card inside machines grid */
+.machine-card.ad-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+    background: linear-gradient(180deg, #ffffff, #fffafc);
+    border: 1px dashed rgba(54, 95, 179, 0.15);
+    color: var(--text-color-secondary);
+    font-weight: 700;
+    font-size: 14px;
+}
+
 .machine-card.status-available {
     background: linear-gradient(180deg, #f0fdf4 0%, #fbfffc 100%);
     border-color: #bbf7d0;
@@ -730,42 +743,6 @@ body::after {
 .machine-card.status-waiting-collection {
     background: linear-gradient(180deg, #fffbeb 0%, #fffdf5 100%);
     border-color: #fbbf24;
-}
-
-.machine-card.start-warning-card {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-height: 140px;
-    background: linear-gradient(180deg, #fff7ed 0%, #fffdf8 100%);
-    border: 1px solid #fdba74;
-    box-shadow: 0 16px 30px rgba(234, 88, 12, 0.08);
-}
-
-.start-warning-card h4 {
-    margin: 0;
-    font-size: 18px;
-    color: #9a3412;
-}
-
-.start-warning-card p {
-    margin: 0;
-    color: #9a3412;
-    font-weight: 600;
-    line-height: 1.5;
-}
-
-.start-warning-chip {
-    display: inline-flex;
-    align-self: flex-start;
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: rgba(234, 88, 12, 0.12);
-    color: #c2410c;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
 }
 
 .machine-card:hover {
@@ -1191,6 +1168,38 @@ tbody tr {
     }
 }
 
+.ad-modal-card {
+    max-width: 500px;
+    text-align: center;
+}
+
+.ad-modal-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.ad-modal-image {
+    width: 50%;
+    height: auto;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ad-countdown-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-color-primary);
+    margin: 0;
+}
+
+.ad-countdown-text span {
+    color: var(--primary-color);
+    font-size: 20px;
+    font-weight: 700;
+}
+
 .repair-code-row {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1220,46 +1229,6 @@ tbody tr {
     color: var(--text-color-secondary);
     margin-top: 6px;
     margin-bottom: 16px;
-}
-
-.start-warning-banner {
-    display: none;
-    margin: 0 0 16px;
-    padding: 16px 18px;
-    border-radius: 14px;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
-    color: #111827;
-    font-weight: 700;
-    line-height: 1.4;
-}
-
-.start-warning-banner.show {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.start-warning-title {
-    font-size: 15px;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #111827;
-}
-
-.start-warning-text {
-    font-size: 14px;
-    color: #374151;
-}
-
-.start-form-shell.is-hidden {
-    display: none;
-}
-
-.start-intro-hidden {
-    display: none;
 }
 
 .field-label {
@@ -1493,5 +1462,63 @@ textarea {
 
     .machine-actions {
         flex-wrap: wrap;
+    }
+}
+/* Usage stats wattage section styles */
+.usage-section-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(100, 100, 100, 0.2), transparent);
+    margin: 2rem 0;
+}
+
+.usage-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    margin: 1.5rem 0 1rem 0;
+    display: block;
+}
+
+.apartment-wattage-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.apartment-wattage-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.apartment-wattage-item:hover {
+    background: #f5f5f5;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.apartment-number {
+    font-weight: 600;
+    color: #333;
+    flex-shrink: 0;
+}
+
+.apartment-watts {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #f26b6d;
+    flex-shrink: 0;
+    margin-left: 1rem;
+}
+
+@media (max-width: 768px) {
+    .apartment-wattage-list {
+        grid-template-columns: 1fr;
     }
 }
