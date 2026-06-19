@@ -1,266 +1,214 @@
 # LaundryFlow
-Laundry room management system for student residences.  
 
----
+A real-time laundry machine management system built with Express.js, SQL Server, and a responsive frontend. Track machine availability, manage sessions, report issues, and monitor energy consumption across your laundry facility.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Tech Stack](#tech-stack)
-- [Prerequisites](#prerequisites)
+- [Features](#features)
+- [Architecture](#architecture)
 - [Getting Started](#getting-started)
-- [API Reference](#api-reference)
+- [Environment Configuration](#environment-configuration)
+- [Running the Application](#running-the-application)
+- [API Endpoints](#api-endpoints)
+- [Frontend Features](#frontend-features)
+- [Database Schema](#database-schema)
 - [Project Structure](#project-structure)
-- [Development](#development)
 
 ---
 
 ## Overview
 
-LaundryFlow provides a backend API to manage:
-- **Rooms** — Student accommodation units
-- **Users** — Residents linked to their rooms
-- **Machines** — Washers and dryers
-- **Sessions** — Machine usage tracking
-- **Issues** — Maintenance incident reporting
+LaundryFlow is a comprehensive laundry machine management platform designed for residential and commercial laundry facilities. It provides real-time monitoring of machine status, session tracking, predictive cycle duration estimation, and detailed consumption analytics.
 
-The browser app that users should open is served from `frontend/`. The root Express route in `backend/server.js` points to that folder, so the frontend directory is the source of truth for the web experience.
-
-
-
-## Tech Stack
-
-| Layer            | Technology                |
-|------------------|---------------------------|
-| Runtime          | Node.js 18 LTS            |
-| Framework        | Express.js 4.x            |
-| Database         | Microsoft SQL Server 2022 |
-| Containerization | Docker + Docker Compose   |
+The system consists of:
+- **Backend API**: Express.js server with SQL Server database
+- **Frontend Dashboard**: Interactive React-style vanilla JavaScript interface
+- **Prediction Engine**: ML-based cycle duration estimation (via `prediction.js`)
+- **Analytics**: Usage statistics and power consumption tracking
 
 ---
 
-## Prerequisites
+## Features
 
-You only need two tools to run this project:
+### Machine Management
+- **Real-time Status Tracking**: View machine availability (Available, In Use, Waiting for Collection, Maintenance)
+- **Add/Delete Machines**: Create new machines with moderator code authentication
+- **Machine Details**: Brand, reference, installation date, and cycle history
+- **Issue Reporting**: Report and track maintenance issues per machine
 
-| Tool           | Purpose                    | Download |
-|----------------|----------------------------|----------|
-| Docker Desktop | Run the entire application | [docker.com](https://www.docker.com/products/docker-desktop) |
-| Git            | Clone the repository       | [git-scm.com](https://git-scm.com/) |
+### Session Management
+- **Start Sessions**: Users fill a form with personal info and apartment/room details
+- **Automated Duration Prediction**: Uses `prediction.js` to estimate cycle duration based on machine type
+- **Live Progress Tracking**: Display countdown timer and progress bar during operation
+- **Session History**: Complete record of all laundry sessions with timestamps
 
-**You do not need to install Node.js, SQL Server, or any dependencies manually.**  
-Docker handles everything. The database schema is also created automatically on first startup — no manual SQL execution required.
+### Analytics & Statistics
+- **Usage Statistics**: Hourly/weekly/monthly usage charts
+- **Power Consumption**: Wattage tracking per time period
+- **Apartment Consumption**: View which apartments consume most energy
+- **Customizable Ranges**: 7-day, monthly, or yearly views
 
----
+### Moderator Controls
+- **4-Digit Code Protection**: Secure actions require moderator authentication
+- **Machine Repair**: Mark machines as repaired to restore availability
+- **Machine Deletion**: Remove machines and their associated data
+- **Stop Override**: Force stop active sessions with moderator approval
 
-## Getting Started
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/your-username/laundryflow.git
-cd laundryflow-app
-```
-
-### 2. Configure environment variables
-
-The application reads its configuration from process environment variables.  
-For Docker Compose, export them in your shell or define them in your CI/CD workflow before starting the stack.
-
-If you use GitHub Actions, create these repository variables and secrets so the workflow can map them automatically:
-
-```text
-GitHub Variables:
-NODE_ENV
-PORT
-DB_HOST
-DB_PORT
-DB_USER
-DB_NAME
-
-GitHub Secrets:
-DB_PASSWORD
-SA_PASSWORD
-```
-
-```powershell
-$env:NODE_ENV = "development"
-$env:PORT = "3000"
-$env:DB_HOST = "mssql"
-$env:DB_PORT = "1433"
-$env:DB_USER = "sa"
-$env:DB_PASSWORD = "YourPassword123!"
-$env:DB_NAME = "LaundryFlowDB"
-$env:SA_PASSWORD = "YourPassword123!"
-
-# Optional: legacy SMS / SMTP notifications
-$env:SMTP_HOST = ""
-$env:SMTP_PORT = "587"
-$env:SMTP_SECURE = "false"
-$env:SMTP_USER = ""
-$env:SMTP_PASS = ""
-$env:NOTIFY_FROM_EMAIL = ""
-$env:TWILIO_ACCOUNT_SID = ""
-$env:TWILIO_AUTH_TOKEN = ""
-$env:TWILIO_FROM_NUMBER = ""
-```
-
-> The values above match the default Docker configuration and work out of the box.  
-> If you change `DB_PASSWORD`, update it consistently for both the backend and SQL Server environment.
-
-> SMS notifications are optional. If the SMTP/Twilio variables are empty, the app will finish cycles normally but will not send alerts.
-
-### 3. Start the application
-
-```bash
-docker compose up --build
-```
-
-This single command will:
-- Build the Node.js backend image
-- Start the SQL Server 2022 instance
-- Automatically create the database and all tables
-- Insert a small set of sample data to get started
-- Start the backend API and connect it to the database
-
-Expected output:
-```
-mssql-1   | SQL Server is ready!
-mssql-1   | Running database initialization script...
-mssql-1   | Database initialization completed successfully!
-backend-1 | Server running on http://localhost:3000
-```
-
-> SQL Server may take up to 60 seconds to initialize on first startup.  
-> The backend waits for the database to be fully ready before starting.
-
-### 4. Verify the application is running
-
-```bash
-curl http://localhost:3000/health
-```
-
-Expected response:
-
-```json
-{ "status": "OK", "database": true }
-```
-
-The application is fully operational. No additional setup is required.
-
-### 5. Open the public UI
-
-Open this URL in your browser:
-
-```text
-http://localhost:3000/
-```
-
-If you deploy the backend to a public host, the same UI will be available at that host's URL because Express serves the static files from `frontend/`.
-
-### Folder Roles
-
-- `frontend/` is the canonical browser-facing app.
-- `backend/public/` is legacy duplicate content and should no longer be used.
-- If you change the UI, update `frontend/` first so the running app stays in sync with what users see.
+### User Interface
+- **Dashboard**: Quick summary of machine counts (Available, In Use, Maintenance, Total)
+- **Machine Grid**: Visual cards showing real-time status and session info
+- **Modal Forms**: Clean, accessible interfaces for all user actions
+- **Toast Notifications**: Feedback for successful/failed actions
+- **Responsive Design**: Works on desktop and mobile devices
 
 ---
 
-## API Reference
+## Architecture
 
-Base URL: `http://localhost:3000`  
-All request bodies and responses use JSON.
-
-### Health
-
-| Method | Endpoint  | Description         |
-|--------|-----------|---------------------|
-| GET    | `/health` | System health check |
+### Database
+- **Rooms**: Apartment/room definitions
+- **Users**: Resident information and room assignments
+- **Machines**: Laundry equipment with type (washer/dryer)
+- **MachineSessions**: Session records with start/end times
+- **MachineIssues**: Maintenance issue tracking
 
 ---
 
-### Rooms — `/api/rooms`
+## Frontend Features
 
-| Method | Endpoint         | Description    |
-|--------|------------------|----------------|
-| GET    | `/api/rooms`     | List all rooms |
-| GET    | `/api/rooms/:id` | Get a room     |
-| POST   | `/api/rooms`     | Create a room  |
+### Dashboard Overview
+The main dashboard displays:
+- **Stat Cards**: Quick counts of machine status
+- **Machine Grid**: Visual cards for each machine with:
+  - Status indicator and label
+  - Brand, reference, installation date
+  - Live session info (user, start time, countdown)
+  - Action buttons (Start, Stop, Report Issue, etc.)
 
-**POST body:**
-```json
-{ "roomNumber": "102.1" }
+### Machine Status States
+
+1. **Available**
+   - No active session
+   - No maintenance issues
+   - Action: "Start Session"
+
+2. **In Use**
+   - Active session running
+   - Shows countdown timer and progress bar
+   - Action: "Stop"
+
+3. **Waiting for Collection**
+   - Cycle complete but not yet collected
+   - Shows apartment and room number
+   - Action: "Stuff Collected"
+
+4. **Maintenance**
+   - Reported issue (unresolved)
+   - Action: "Machine Repaired"
+
+### Forms & Modals
+
+#### Start Session Form
+- First Name, Last Name (required)
+- Email (required, validated)
+- Country Code + Phone Number (required, validated)
+- Apartment Number (required)
+- Room Number (required)
+- **Automatic**: Cycle duration estimated via `prediction.js`
+
+#### Report Issue Form
+- Machine selection
+- Issue description (text area)
+- Attachment: Submit report
+
+#### Stop Session Form
+- Confirm apartment number
+- Confirm room number
+- Moderator override option
+
+#### Add Machine Form
+- Requires 4-digit moderator code first
+- Machine Type (Washer/Dryer)
+- Brand, Reference, Installation Date
+- Auto-generates machine name
+
+#### Repair Machine Form
+- Requires 4-digit moderator code
+- Marks machine as repaired
+
+### Statistics Tab
+
+Click "+ Statistics" button to view:
+
+**Usage by Time Period**
+- 7-day, Monthly, or Yearly view
+- Hours used per time bucket
+- Total, Peak, and Average metrics
+
+**Power Consumption**
+- Wattage charts matching time period
+- Real-time consumption estimates per session
+
+**Consumption by Apartment**
+- Sorted list of apartments by watts used
+- Quick identification of heavy users
+
+### Session Tracking
+
+The app tracks sessions in LocalStorage with:
+- Start timestamp
+- Predicted end timestamp
+- Progress percentage
+- User first name
+- Apartment/room number
+
+---
+
+## Database Schema
+
+### Rooms
+```sql
+Id (INT, PK)
+RoomNumber (VARCHAR, UNIQUE)
 ```
 
----
-
-### Users — `/api/users`
-
-| Method | Endpoint          | Description    |
-|--------|-------------------|----------------|
-| GET    | `/api/users`      | List all users |
-| GET    | `/api/users/:id`  | Get a user     |
-| POST   | `/api/users`      | Create a user  |
-| PUT    | `/api/users/:id`  | Update a user  |
-| DELETE | `/api/users/:id`  | Delete a user  |
-
-**POST body:**
-```json
-{
-  "name": "John Doe",
-  "email": "john@email.com",
-  "phone": "+33123456789",
-  "roomId": 1
-}
+### Users
+```sql
+Id (INT, PK)
+Name (VARCHAR)
+Email (VARCHAR, UNIQUE)
+Phone (VARCHAR)
+RoomId (INT, FK → Rooms)
 ```
 
----
-
-### Machines — `/api/machines`
-
-| Method | Endpoint            | Description       |
-|--------|---------------------|-------------------|
-| GET    | `/api/machines`     | List all machines |
-| GET    | `/api/machines/:id` | Get a machine     |
-| POST   | `/api/machines`     | Create a machine  |
-
-**POST body:**
-```json
-{ "name": "Machine 3", "type": "washer" }
+### Machines
+```sql
+Id (INT, PK)
+Name (VARCHAR)
+Type (VARCHAR) -- 'washer' or 'dryer'
+Brand (VARCHAR)
+Reference (VARCHAR)
+InstalledAt (DATETIME)
 ```
 
-`type` accepts `"washer"` or `"dryer"`.
-
----
-
-### Sessions — `/api/sessions`
-
-| Method | Endpoint                     | Description             |
-|--------|------------------------------|-------------------------|
-| GET    | `/api/sessions`              | List all sessions       |
-| GET    | `/api/sessions/user/:userId` | Get sessions for a user |
-| POST   | `/api/sessions`              | Start a session         |
-| PUT    | `/api/sessions/:id`          | End a session           |
-
-**POST body:**
-```json
-{ "machineId": 1, "userId": 1 }
+### MachineSessions
+```sql
+Id (INT, PK)
+MachineId (INT, FK → Machines)
+UserId (INT, FK → Users)
+StartTime (DATETIME)
+EndTime (DATETIME, nullable)
 ```
 
----
-
-### Issues — `/api/issues`
-
-| Method | Endpoint                         | Description              |
-|--------|----------------------------------|--------------------------|
-| GET    | `/api/issues`                    | List all issues          |
-| GET    | `/api/issues/machine/:machineId` | Get issues for a machine |
-| POST   | `/api/issues`                    | Report an issue          |
-| PUT    | `/api/issues/:id`                | Mark as resolved         |
-
-**POST body:**
-```json
-{ "machineId": 1, "description": "Machine not spinning" }
+### MachineIssues
+```sql
+Id (INT, PK)
+MachineId (INT, FK → Machines)
+Description (VARCHAR)
+CreatedAt (DATETIME)
+ResolvedAt (DATETIME, nullable)
+IsResolved (BIT)
 ```
 
 ---
@@ -269,37 +217,106 @@ All request bodies and responses use JSON.
 
 ```
 laundryflow-app/
-├── README.md
-├── ARCHITECTURE.md          # Design decisions and schema documentation
-├── docker-compose.yml       # Service orchestration
-├── db/
-│   ├── init.sql             # Creates the database schema on first startup
-│   └── entrypoint.sh        # Waits for SQL Server to be ready, then runs init.sql
 ├── backend/
-│   ├── server.js            # Express server and all API routes
+│   ├── Dockerfile           # Node.js 18 Alpine image
+│   ├── server.js            # Express API (all endpoints)
 │   ├── package.json
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── .env                 # Local credentials — not committed to Git
-│   └── .env.example         # Template to copy for your own .env
-└── frontend/                # Static frontend served by Express
-    ├── index.html
-    ├── app.js
-    └── style.css
+│   └── package-lock.json
+├── frontend/
+│   ├── index.html           # Main HTML file (dashboard)
+│   ├── app.js               # Main application logic
+│   ├── style.css            # Responsive styling
+│   ├── prediction.js        # Cycle duration ML estimation
+│   └── wattage-functions.js # Power consumption calculations
+├── db/
+│   ├── init.sql             # Database initialization & seed data
+│   └── entrypoint.sh        # Database startup script
+├── docker-compose.yml       # Services orchestration
+├── .env                     # Environment variables
+├── .dockerignore
+├── .gitignore
+└── README.md                # This file
 ```
 
 ---
 
-## Development
+## Moderator Code
 
-### Common commands
+Default moderator code: `0000`
 
-| Action                | Command                                    |
-|-----------------------|--------------------------------------------|
-| Start containers      | `docker compose up --build`                |
-| Stop containers       | `docker compose down`                      |
-| View logs             | `docker compose logs -f`                   |
-| Restart after changes | `docker compose down && docker compose up` |
+Required for:
+- Adding new machines
+- Deleting machines
+- Repairing machines
+- Force-stopping sessions
 
-> Data is persisted in a Docker volume. Running `docker compose down` does not delete the database.  
-> The initialization script uses `IF NOT EXISTS` checks — restarting the containers will never overwrite existing data.
+Change in `backend/server.js`:
+```javascript
+const MODERATOR_CODE = process.env.MODERATOR_CODE || '0000';
+```
+
+---
+
+## Troubleshooting
+
+### Services Won't Start
+```bash
+# Check logs
+docker compose logs
+
+# Verify SQL Server is healthy
+docker compose ps
+
+# Reset everything
+docker compose down --volumes
+docker compose up --build
+```
+
+### Machines Not Loading
+- Check backend is running: `docker compose logs backend`
+- Verify database connection: Look for "Connected to SQL Server" in logs
+- Check API: `curl http://localhost:3000/api/machines`
+
+### Form Validation Errors
+- Ensure phone number format: `+33 2 97 26 58 41`
+- Email must contain `@` and valid domain
+- All required fields must be filled
+- Check browser console (F12) for validation details
+
+### Session Duration Not Showing
+- Ensure `prediction.js` is loaded (check DevTools → Network)
+- Check that machine type is set (washer/dryer)
+- Verify no JavaScript errors in console
+
+### Statistics Not Updating
+- Clear browser cache: Ctrl+Shift+Delete
+- Clear LocalStorage: DevTools → Application → Local Storage → Clear All
+- Restart backend: `docker compose restart backend`
+- Refresh page: F5
+
+---
+
+## Performance Notes
+
+- Frontend refreshes dashboard every 10 seconds
+- Session countdown updates every 1 second
+- Each user action creates new database connection (no connection pooling overhead)
+- LocalStorage persists session metadata for instant UI updates
+- Prediction.js generates synthetic power profiles (~100ms per calculation)
+
+---
+
+## Security Considerations
+
+- **Moderator Code**: Stored in environment variable (not hardcoded)
+- **Database Access**: SQL Server credentials in `.env` (not in version control)
+- **CORS**: Enabled (adjust if deploying to production)
+- **Input Validation**: Email, phone, and date validation on frontend and backend
+- **SQL Injection**: Parameterized queries via mssql driver
+
+---
+
+## Future Enhancements
+- Real sensor integration for actual power consumption
+- User authentication and login
+- Email notifications for session completion
