@@ -53,16 +53,11 @@ const MODERATOR_CODE = process.env.MODERATOR_CODE || '0000';
  * SQL Server connection configuration.
  */
 const sqlConfig = {
-  authentication: {
-    type: 'default',
-    options: {
-      /** Database username */
-      userName: process.env.DB_USER,
+  /** Database username */
+  user: process.env.DB_USER,
 
-      /** Database password */
-      password: process.env.DB_PASSWORD,
-    }
-  },
+  /** Database password */
+  password: process.env.DB_PASSWORD,
 
   /** SQL Server hostname */
   server: process.env.DB_HOST,
@@ -84,9 +79,7 @@ const sqlConfig = {
   options: {
     encrypt: false,
     trustServerCertificate: true,
-    enableKeepAlive: true,
-    connectionTimeout: 15000,
-    requestTimeout: 15000
+    enableArithAbort: true
   }
 };
 
