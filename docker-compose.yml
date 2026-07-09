@@ -46,8 +46,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    # Run the initialization script before SQL Server starts
-    entrypoint: /bin/bash -c "/db/entrypoint.sh & /opt/mssql/bin/sqlservr"
+    # Use a single wrapper entrypoint that starts SQL Server, waits for readiness,
+    # runs init.sql, then keeps the container attached to the SQL Server process.
+    entrypoint: ["/bin/bash", "/db/entrypoint.sh"]
     # Shared network for backend and database containers
     networks:
       - laundryflow-network
